@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE taskdata [
+    <!ELEMENT taskdata  (topic+)           >
+    <!ELEMENT topic       (title, docsetA, docsetB) >
+    <!ELEMENT title       (#PCDATA)           >
+    <!ELEMENT docsetA     (doc+)              >
+    <!ELEMENT docsetB     (doc+)              >
+    <!ELEMENT doc          EMPTY              >		       
+
+    <!ATTLIST taskdata
+                      year    CDATA              #REQUIRED
+		      track   (SUMMARIZATION)    #REQUIRED
+                      task    (COMPARATIVE)           #REQUIRED
+		      dataset (SAMPLE|TEST)             #REQUIRED >
+
+    <!ATTLIST topic  id      ID    #REQUIRED >
+
+    <!ATTLIST docsetA  id    ID    #REQUIRED >
+
+    <!ATTLIST docsetB  id    ID    #REQUIRED >
+
+    <!ATTLIST doc      id    CDATA #REQUIRED >   
+
+<!-- ====================================================================== -->
+]>
+
+<taskdata year="2018" track="SUMMARIZATION" task="COMPARATIVE"  dataset="TEST">
+<topic id = "C1801">
+	<title>9/11 author comparison</title>
+
+	<docsetA id = "C1801-A">
+		<doc id = "MON_FR_20010912.0759" />
+	</docsetA>
+
+	<docsetB id = "C1801-B">
+		<doc id = "MON_FR_20010912.1018" />
+	</docsetB>
+</topic>
+<topic id = "C1802">
+	<title>9/11 french vs world reaction</title>
+
+	<docsetA id = "C1802-A">
+		<doc id = "NOBS_FR_20010913.1629" />
+	</docsetA>
+
+	<docsetB id = "C1802-B">
+		<doc id = "NOBS_FR_20010913.1706" />
+	</docsetB>
+</topic>
+</taskdata>

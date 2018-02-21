@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<!DOCTYPE taskdata [
+    <!ELEMENT taskdata  (topic+)           >
+    <!ELEMENT topic       (title, docsetA, docsetB) >
+    <!ELEMENT title       (#PCDATA)           >
+    <!ELEMENT docsetA     (doc+)              >
+    <!ELEMENT docsetB     (doc+)              >
+    <!ELEMENT doc          EMPTY              >		       
+
+    <!ATTLIST taskdata
+                      year    CDATA              #REQUIRED
+		      track   (SUMMARIZATION)    #REQUIRED
+                      task    (COMPARATIVE)           #REQUIRED
+		      dataset (SAMPLE|TEST)             #REQUIRED >
+
+    <!ATTLIST topic  id      ID    #REQUIRED >
+
+    <!ATTLIST docsetA  id    ID    #REQUIRED >
+
+    <!ATTLIST docsetB  id    ID    #REQUIRED >
+
+    <!ATTLIST doc      id    CDATA #REQUIRED >   
+
+<!-- ====================================================================== -->
+]>
+
+<taskdata year="2018" track="SUMMARIZATION" task="COMPARATIVE"  dataset="TEST">
+<topic id = "C1801">
+	<title>Chile/Haiti earthquake in 2010</title>
+
+	<docsetA id = "C1801-A">
+		<doc id = "BBC_EN_0001.001" />
+	</docsetA>
+
+	<docsetB id = "C1801-B">
+		<doc id = "BBC_EN_0001.007" />
+	</docsetB>
+</topic>
+</taskdata>
