@@ -97,7 +97,6 @@ class ilp(object):
         self.w_ij = []
 
     def prepare(self):
-        ilp.prepare()
         self._make_concept()
         print("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
 
@@ -193,12 +192,10 @@ def ilp_we(ilp):
 
     def prepare(self):
         self._update_model()
-        self._make_concept()
-        print("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
+        self.prepare()
         threshold = 0.2
         if os.path.exists():
-            self.u_jk = read_concept_pair('pair_ilp_wordembdeddings_' +
-                                          str(threshold))
+            self.u_jk = read_concept_pair('pair_ilp_we_' + str(threshold))
         else:
             self.u_jk = self._make_concept_pair(self.c_ij, self.w_ij)
 
