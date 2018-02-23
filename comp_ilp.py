@@ -97,6 +97,7 @@ class ilp(object):
         self.w_ij = []
 
     def prepare(self):
+        ilp.prepare()
         self._make_concept()
         print("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
 
