@@ -46,6 +46,12 @@ class Sentence:
         self.unresolved = unresolved
         self.atleast = ""
 
+    def __len__(self):
+        return len(self.tok2)
+
+    def __iter__(self):
+        return iter(self.tok2)
+
     def get_list_word(self):
         return self.tok2
 

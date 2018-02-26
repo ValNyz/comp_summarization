@@ -30,6 +30,27 @@ def generate_isf_dict(vocab_word, *l_sents):
     return dict_isf
 
 
+def generate_idf_dict(vocab_word, *l_docs):
+    """
+    generate dictionary of inverse document frequency for word in l_sents
+    :param l_sents: list[list[list[str]]] : list of docs as list of sentences
+    as list of word
+    :return: dict{int : int} : dictionnary of id_word and inverse document
+    frequency
+    """
+    docs = chain(*l_docs)
+    dict_idf = {}
+    for doc in docs:
+        for word in set(chain(doc)):
+            if vocab_word[word] in dict_idf:
+                dict_idf[vocab_word[word]] += 1.
+            else:
+                dict_idf[vocab_word[word]] = 1.
+    for id_word in dict_idf.keys():
+        dict_idf[id_word] = math.log2(float(len(docs))/dict_idf[id_word])
+    return dict_idf
+
+
 def generate_tf_sent_dict(vocab_word, vocab_id, *l_docs):
     dict_doc = {}
     docs = chain(l_docs)

@@ -30,10 +30,20 @@
 
 	<docsetA id = "C1801-A">
 		<doc id = "BBC_EN_0001.001" />
+		<doc id = "BRI_EN_0001.002" />
+		<doc id = "CNN_EN_0001.003" />
+		<doc id = "GUA_EN_0001.004" />
+		<doc id = "HUF_EN_0001.005" />
+		<doc id = "NYT_EN_0001.006" />
 	</docsetA>
 
 	<docsetB id = "C1801-B">
 		<doc id = "BBC_EN_0001.007" />
+		<doc id = "BRI_EN_0001.008" />
+		<doc id = "CNN_EN_0001.009" />
+		<doc id = "GUA_EN_0001.010" />
+		<doc id = "GUA_EN_0002.011" />
+		<doc id = "NYT_EN_0001.012" />
 	</docsetB>
 </topic>
 </taskdata>

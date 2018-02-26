@@ -13,25 +13,30 @@ logger = logging.getLogger(__name__)
 
 
 def score_sentence_knapsack(*l_sents):
-    kp = ilp.Ilp_we('testWiki', l_sents)
+    kp = ilp.Comp_Model_we('testWiki', l_sents)
     kp.prepare()
     ocs_ikj = [[[1 if j in k else 0 for j in kp.c_ij[i]] for k in kp.s_ik[i]]
                for i in range(len(kp.c_ij))]
-    summary = knapsack(200, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik, kp.l_ik)
-
-    for sent in summary:
-        print(l_sents[sent[0]][sent[1]])
+    summary = knapsack(l_sents, 200, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik,
+                       kp.l_ik)
+    print_summary(l_sents, summary)
 
     return None
 
 
+def print_summary(l_sents, summary):
+    for sent in summary:
+        print(l_sents[sent[0]][sent[1]])
+
+
 # A Dynamic Programming based Python Program for 0-1 Knapsack problem
 # Returns the maximum value that can be put in a knapsack of capacity W
-def knapsack(sumSize, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
+def knapsack(l_sents, sumSize, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     """knapsack
 
+    :param l_sents:
     :param sumSize:
-    :param c_ij:
+    :param ocs_ikj:
     :param w_ij:
     :param u_jk:
     :param s_ik:
@@ -43,13 +48,15 @@ def knapsack(sumSize, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
           for s1 in range(len(s_ik[1]) + 1)]
          for s0 in range(len(s_ik[0]) + 1)]
 
-    # Build table K[][] in bottom up manner
     for s0 in range(len(s_ik[0]) + 1):
         for s1 in range(len(s_ik[1]) + 1):
             for w in range(sumSize + 1):
-                if s0 == 0 or s1 == 0 or w == 0:
+                if s0 == 0 and s1 == 0 or w == 0:
                     # K[s0][s1][w] = (0, [])
                     pass
+                elif s0 != 0 and s1 == 0:
+                    K[s0][s1][w] = K[s0-1][len(s_ik[1])][w]
+                    print_summary(l_sents, K[s0-1][len(s_ik[1])][w])
                 elif l_ik[0][s0-1] + l_ik[1][s1-1] <= w:
                     current_sum = list(K[s0][s1-1]
                                         [w-l_ik[0][s0-1]-l_ik[1][s1-1]]
@@ -64,14 +71,13 @@ def knapsack(sumSize, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
                         K[s0][s1][w] = K[s0][s1-1][w]
                 else:
                     K[s0][s1][w] = K[s0][s1-1][w]
-    print(K)
-    return K[len(s_ik[0])+1][len(s_ik[1]+1)][sumSize+1]
+    return K[len(s_ik[0])][len(s_ik[1])][sumSize+1]
 
 
 def obj(lambd, ocs_ikj, w_ij, u_jk, summary):
     comp = 0.
     rep = 0.
-    lc_0 =set()
+    lc_0 = set()
     lc_1 = set()
     for sen in summary:
         # sen = (i, k)

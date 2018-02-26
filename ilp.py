@@ -11,12 +11,13 @@ import threading
 from nltk.corpus import reuters
 import math
 import gensim.models
-from itertools import product
+from itertools import product, chain
 from collections import Counter
 from nltk.util import ngrams
 from nltk.corpus import wordnet as wn
 import numpy as np
 from scipy.spatial.distance import cosine
+from model.wmd import word_mover_distance
 import pulp
 from pulp import lpSum
 import logging
@@ -24,13 +25,25 @@ logger = logging.getLogger(__name__)
 
 
 def score_sentence_ilp(*l_sents):
-    ilp = Ilp_we('testWiki', l_sents)
+    ilp = Comp_we('testWiki', l_sents)
     ilp.prepare()
-    # dict_idf = concept_idf_dict(l_sents, "reuters")
-    # for concept in ilp.w_ij[0].keys():
-        # ilp.w_ij[0][concept] = ilp.w_ij[0][concept]*dict_idf[concept]
-    # for concept in ilp.w_ij[1].keys():
-        # ilp.w_ij[1][concept] = ilp.w_ij[1][concept]*dict_idf[concept]
+    docs = []
+    p_doc_name = ""
+    doc_id = -1
+    for sent in chain(*l_sents):
+        if sent.doc != p_doc_name:
+            docs.append([])
+            doc_id += 1
+            p_doc_name = sent.doc
+            print(p_doc_name)
+        docs[doc_id].append(sent.get_list_word())
+    dict_idf = make_concept_idf_dict(docs)
+    # print(dict_idf)
+    # dict_idf = reuters_idf_dict(l_sents, "reuters")
+    for concept in ilp.w_ij[0].keys():
+        ilp.w_ij[0][concept] = ilp.w_ij[0][concept]*dict_idf[concept]
+    for concept in ilp.w_ij[1].keys():
+        ilp.w_ij[1][concept] = ilp.w_ij[1][concept]*dict_idf[concept]
     generate_ilp_problem(l_sents, ilp.c_ij, ilp.w_ij, ilp.u_jk, ilp.s_ik,
                          ilp.l_ik)
     return None
@@ -45,24 +58,30 @@ def generate_ilp_problem(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik):
     :param s_ik: list[list[list[concept]]]: list doc as a list of sentence as a
     list of concept
     """
+    logger.info("Generate ILP problem")
     prob = pulp.LpProblem('summarize', pulp.LpMaximize)
 
+    logger.info("oc_ij")
     # oc_ij
     oc_ij = pulp.LpVariable.dicts('concepts', [(i, j) for i in range(len(c_ij))
                                                for j in range(len(c_ij[i]))],
                                   0, 1, pulp.LpBinary)
+    logger.info("op_jk")
     # op_jk
     op_jk = pulp.LpVariable.dicts('pairs', [(j, k) for j in range(len(u_jk))
                                             for k in range(len(u_jk[j]))],
                                   0, 1, pulp.LpBinary)
+    logger.info("ocs_ijk")
     # ocs_ijk
     ocs_ijk = [[[1 if j in k else 0 for k in s_ik[i]] for j in c_ij[i]] for
                i in range(len(c_ij))]
+    logger.info("os_ik")
     # os_ik
     os_ik = pulp.LpVariable.dicts('sentences',
                                   [(i, k) for i in range(len(c_ij))
                                    for k in range(len(s_ik[i]))],
                                   0, 1, pulp.LpBinary)
+    logger.info("Constraint")
     lambd = 0.55
     prob += lambd*pulp.lpSum([u_jk[j][k]*op_jk[(j, k)]
                               for j in range(len(c_ij[0]))
@@ -94,6 +113,7 @@ def generate_ilp_problem(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik):
     # The problem data is written to an .lp file
     # print(prob)
     prob.writeLP("comp_ilp.lp")
+    logger.info("Solve ILP problem")
     prob.solve()
     # The status of the solution is printed to the screen
     print("Status:", pulp.LpStatus[prob.status])
@@ -109,7 +129,7 @@ def generate_ilp_problem(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik):
     return None
 
 
-class Ilp(object):
+class Comp_model(object):
     def __init__(self, l_sents):
         self.l_sents = l_sents
         self.typ = 'pos'
@@ -117,11 +137,13 @@ class Ilp(object):
         self.s_ik = []
         self.l_ik = []
         self.w_ij = []
-        self.u_jk = ['e']
+        self.u_jk = []
 
     def prepare(self):
         self._make_concept()
         print("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
+        print("Nb concept in doc 0 : " + str(len(self.c_ij[0])))
+        print("Nb concept in doc 1 : " + str(len(self.c_ij[1])))
 
     def _make_concept(self, order=2):
         """_make_concept
@@ -141,7 +163,9 @@ class Ilp(object):
                     sent = sentence.get_list_word_pos()
                 else:
                     sent = sentence.get_list_word()
-                temp = list(ngrams(sent, order))
+                temp = []
+                if order > 1:
+                    temp.extend(list(ngrams(sent, order)))
                 for w in sent:
                     temp.append((w,))
                 # temp.extend(sent)
@@ -153,9 +177,9 @@ class Ilp(object):
         return self.c_ij, self.s_ik, self.l_ik, self.w_ij
 
 
-class Ilp_wordnet(Ilp):
+class Comp_wordnet(Comp_model):
     def prepare(self):
-        Ilp.prepare(self)
+        Comp_model.prepare(self)
         threshold = 0.2
         if os.path.exists():
             self.u_jk = read_concept_pair('pair_ilp_wordnet_' + str(threshold))
@@ -214,14 +238,14 @@ class Ilp_wordnet(Ilp):
         return best
 
 
-class Ilp_we(Ilp):
+class Comp_we(Comp_model):
     def __init__(self, model_name, l_sents):
-        Ilp.__init__(self, l_sents)
+        Comp_model.__init__(self, l_sents)
         self.typ = 'word'
         self._update_model(model_name)
 
     def prepare(self):
-        Ilp.prepare(self)
+        Comp_model.prepare(self)
         threshold = 0.2
         if os.path.exists('pair_ilp_we_' + str(threshold)):
             self.u_jk = read_concept_pair('pair_ilp_we_' + str(threshold),
@@ -251,12 +275,10 @@ class Ilp_we(Ilp):
         :param threshold:
         :return list[np.array]: size [j, k]
         """
-        print("Nb concept in doc 0 : " + str(len(self.c_ij[0])))
-        print("Nb concept in doc 1 : " + str(len(self.c_ij[1])))
         # build list pair concept
         for j in range(len(self.c_ij[0])):
             self.u_jk.append(np.zeros(len(self.c_ij[1]), float))
-        with open('pair_ilp_we_' + str(threshold), 'w') as f:
+        with open('pair_' + str(threshold), 'w') as f:
             q = queue.Queue()
             threads = []
             for i in range(4):
@@ -290,20 +312,20 @@ class Ilp_we(Ilp):
             c_1 = item[1][1]
             j = item[0][0]
             k = item[1][0]
-            sim = self._cosine_similarity(c_0, c_1)
+            sim = self._similarity(c_0, c_1)
             if sim > threshold:
-                self.u_jk[j][k] = sim
-                # (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
+                # self.u_jk[j][k] = sim
+                (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
             else:
                 self.u_jk[j][k] = 0
             f.write(' '.join(c_0) + '\t' + ' '.join(c_1)
                     + '\t' + str(self.u_jk[j][k]) + '\n')
 
-    def _cosine_similarity(self, c_0, c_1):
+    def _similarity(self, c_0, c_1):
         if not isinstance(c_0, tuple):
-            c_0 = [c_0]
+            c_0 = (c_0, )
         if not isinstance(c_1, tuple):
-            c_1 = [c_1]
+            c_1 = (c_1, )
         # print(c_0)
         # print(c_1)
         list_sim = [cosine_similarity(self.model, w0, w1) for w0 in c_0
@@ -311,6 +333,20 @@ class Ilp_we(Ilp):
         best = sum(list_sim)/len(list_sim)
         # print(best)
         return best
+
+
+class Comp_we_wmd(Comp_we):
+    def prepare(self):
+        Comp_model.prepare(self)
+
+    def _similarity(self, c_0, c_1):
+        if not isinstance(c_0, tuple):
+            c_0 = (c_0, )
+        if not isinstance(c_1, tuple):
+            c_1 = (c_1, )
+        result = word_mover_distance(c_0, c_1, self.model)
+        # print(result)
+        return result
 
 
 def doc_to_str(l_sents):
@@ -338,7 +374,7 @@ def cosine_similarity(model, w1, w2):
     return 1-cosine(model[w1], model[w2])
 
 
-def make_concept_idf_dict(order, docs):
+def make_concept_idf_dict(docs, order=2):
     """
     generate dictionary of inverse document frequency for word in l_sents
     :param l_sents: list[list[list[str]]] : list of docs as list of sentences
@@ -350,9 +386,10 @@ def make_concept_idf_dict(order, docs):
     for doc in docs:
         set_doc_concept = set()
         for sent in doc:
-            set_doc_concept.update(ngrams(sent, order))
+            if order > 1:
+                set_doc_concept.update(ngrams(sent, order))
             for w in sent:
-                set_doc_concept.append((w,))
+                set_doc_concept.add((w,))
         for concept in set_doc_concept:
             if concept in dict_idf:
                 dict_idf[concept] += 1.
@@ -364,7 +401,7 @@ def make_concept_idf_dict(order, docs):
     return dict_idf
 
 
-def concept_idf_dict(current_docs, file_name, order=2):
+def reuters_idf_dict(current_docs, file_name, order=2):
     """
     """
     idf_file = file_name + ".idf"
@@ -381,7 +418,7 @@ def concept_idf_dict(current_docs, file_name, order=2):
             l_docs.append(doc)
         for fileid in reuters.fileids():
             l_docs.append(reuters.sents(fileids=[fileid]))
-        dict_idf = make_concept_idf_dict(order, l_docs)
+        dict_idf = make_concept_idf_dict(l_docs, order)
         with open(idf_file, 'w') as f:
             for concept in dict_idf.keys():
                 f.write(' '.join(concept) + '\t' + str(dict_idf[concept]) +
