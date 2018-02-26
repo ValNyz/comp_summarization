@@ -9,7 +9,8 @@ __author__ : Valentin Nyzam
 import time
 import os
 import browse_corpus
-from comp_ilp import score_sentence_ilp
+from knapsack import score_sentence_knapsack
+from ilp import score_sentence_ilp
 # from minimum_dominating_set import score_sentences_MDS
 # from cross_entropy_summary import score_sentences_cross_entropy
 # from k_core_summary import score_sentences_k_core
@@ -31,6 +32,7 @@ def make_comp_summary(data_path, corpus_id, summ_path, length, options):
     s_A, sents_A = browse_corpus.load_sents(data_path, corpus_id + '-A')
     s_B, sents_B = browse_corpus.load_sents(data_path, corpus_id + '-B')
 
+    # score_sentence_knapsack(sents_A, sents_B)
     score_sentence_ilp(sents_A, sents_B)
     # score_sentences_MDS(sents_A, sents_B)
     # dict_sent_A, dict_sent_B = score_sentences_k_core(sents_A, sents_B, \
