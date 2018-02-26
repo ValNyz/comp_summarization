@@ -247,8 +247,8 @@ class Comp_we(Comp_model):
     def prepare(self):
         Comp_model.prepare(self)
         threshold = 0.2
-        if os.path.exists('pair_ilp_we_' + str(threshold)):
-            self.u_jk = read_concept_pair('pair_ilp_we_' + str(threshold),
+        if os.path.exists('pair_' + str(threshold)):
+            self.u_jk = read_concept_pair('pair_' + str(threshold),
                                           self.c_ij)
         else:
             self._make_concept_pair()
@@ -316,10 +316,10 @@ class Comp_we(Comp_model):
             if sim > threshold:
                 # self.u_jk[j][k] = sim
                 (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
-            else:
-                self.u_jk[j][k] = 0
-            f.write(' '.join(c_0) + '\t' + ' '.join(c_1)
-                    + '\t' + str(self.u_jk[j][k]) + '\n')
+            # else:
+                # self.u_jk[j][k] = 0
+                f.write(' '.join(c_0) + '\t' + ' '.join(c_1)
+                        + '\t' + str(self.u_jk[j][k]) + '\n')
 
     def _similarity(self, c_0, c_1):
         if not isinstance(c_0, tuple):
