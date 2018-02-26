@@ -8,7 +8,8 @@ __author__ : Valentin Nyzam
 import os
 
 #ROOT = os.path.realpath(os.path.dirname(sys.argv[0])) + '/../'
-ROOT = '/home/arch/valnyz/python/comp_summarization'
+THREAD = 8
+ROOT = '/home/nyzam/comp_summarization'
 
 DATA_ROOT = os.path.join(ROOT, 'data')
 TOOLS_ROOT = os.path.join(ROOT, 'tools')
