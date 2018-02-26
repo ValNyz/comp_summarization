@@ -26,12 +26,13 @@ logger = logging.getLogger(__name__)
 def score_sentence_ilp(*l_sents):
     ilp = Ilp_we('testWiki', l_sents)
     ilp.prepare()
-    # dict_idf = concept_idf_dict(ilp.c_ij, l_sents, "reuters")
+    # dict_idf = concept_idf_dict(l_sents, "reuters")
     # for concept in ilp.w_ij[0].keys():
         # ilp.w_ij[0][concept] = ilp.w_ij[0][concept]*dict_idf[concept]
     # for concept in ilp.w_ij[1].keys():
         # ilp.w_ij[1][concept] = ilp.w_ij[1][concept]*dict_idf[concept]
-    generate_ilp_problem(l_sents, ilp.c_ij, ilp.w_ij, ilp.u_jk, ilp.s_ik, ilp.l_ik)
+    generate_ilp_problem(l_sents, ilp.c_ij, ilp.w_ij, ilp.u_jk, ilp.s_ik,
+                         ilp.l_ik)
     return None
 
 
@@ -337,7 +338,7 @@ def cosine_similarity(model, w1, w2):
     return 1-cosine(model[w1], model[w2])
 
 
-def make_concept_idf_dict(vocab_concept, order, docs):
+def make_concept_idf_dict(order, docs):
     """
     generate dictionary of inverse document frequency for word in l_sents
     :param l_sents: list[list[list[str]]] : list of docs as list of sentences
@@ -347,23 +348,23 @@ def make_concept_idf_dict(vocab_concept, order, docs):
     """
     dict_idf = {}
     for doc in docs:
-        list_docs_concept = []
+        set_doc_concept = set()
         for sent in doc:
-            list_docs_concept.extend(set(ngrams(sent, order)))
+            set_doc_concept.update(ngrams(sent, order))
             for w in sent:
-                list_docs_concept.append((w,))
-        for concept in list_docs_concept:
-            if concept in vocab_concept:
+                set_doc_concept.append((w,))
+        for concept in set_doc_concept:
+            if concept in dict_idf:
                 dict_idf[concept] += 1.
             else:
                 dict_idf[concept] = 1.
-    print(dict_idf)
+    # print(dict_idf)
     for concept in dict_idf.keys():
         dict_idf[concept] = math.log2(float(len(docs))/dict_idf[concept])
     return dict_idf
 
 
-def concept_idf_dict(vocab_concept, current_docs, file_name, order=2):
+def concept_idf_dict(current_docs, file_name, order=2):
     """
     """
     idf_file = file_name + ".idf"
@@ -380,7 +381,7 @@ def concept_idf_dict(vocab_concept, current_docs, file_name, order=2):
             l_docs.append(doc)
         for fileid in reuters.fileids():
             l_docs.append(reuters.sents(fileids=[fileid]))
-        dict_idf = make_concept_idf_dict(vocab_concept, order, l_docs)
+        dict_idf = make_concept_idf_dict(order, l_docs)
         with open(idf_file, 'w') as f:
             for concept in dict_idf.keys():
                 f.write(' '.join(concept) + '\t' + str(dict_idf[concept]) +
