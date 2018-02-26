@@ -18,6 +18,7 @@ from nltk.corpus import wordnet as wn
 import numpy as np
 from scipy.spatial.distance import cosine
 from model.wmd import word_mover_distance
+from globals import THREAD
 import pulp
 from pulp import lpSum
 import logging
@@ -68,8 +69,8 @@ def generate_ilp_problem(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik):
                                   0, 1, pulp.LpBinary)
     logger.info("op_jk")
     # op_jk
-    op_jk = pulp.LpVariable.dicts('pairs', [(j, k) for j in range(len(u_jk))
-                                            for k in range(len(u_jk[j]))],
+    op_jk = pulp.LpVariable.dicts('pairs', [(j, k) for j in range(len(c_ij[0]))
+                                            for k in range(len(c_ij[1]))],
                                   0, 1, pulp.LpBinary)
     logger.info("ocs_ijk")
     # ocs_ijk
@@ -83,12 +84,13 @@ def generate_ilp_problem(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik):
                                   0, 1, pulp.LpBinary)
     logger.info("Constraint")
     lambd = 0.55
-    prob += lambd*pulp.lpSum([u_jk[j][k]*op_jk[(j, k)]
+    prob += lambd*pulp.lpSum([u_jk[(j, k)]*op_jk[(j, k)]
+                              if (j, k) in u_jk else 0
                               for j in range(len(c_ij[0]))
                               for k in range(len(c_ij[1]))]) + (1-lambd)*lpSum(
                              [w_ij[i][c_ij[i][j]]*oc_ij[(i, j)] for i in
                               range(len(c_ij)) for j in range(len(c_ij[i]))])
-    # prob += pulp.lpSum([tf[w] * word_vars[w] for w in tf])
+
     for j in range(len(c_ij[0])):
         for k in range(len(c_ij[1])):
             prob += op_jk[(j, k)] <= oc_ij[(0, j)] and op_jk[(j, k)] <= \
@@ -133,11 +135,12 @@ class Comp_model(object):
     def __init__(self, l_sents):
         self.l_sents = l_sents
         self.typ = 'pos'
+        self.dc = {}
         self.c_ij = []
         self.s_ik = []
         self.l_ik = []
         self.w_ij = []
-        self.u_jk = []
+        self.u_jk = {}
 
     def prepare(self):
         self._make_concept()
@@ -174,6 +177,13 @@ class Comp_model(object):
                 self.c_ij[i].extend(temp)
             self.w_ij.append(Counter(self.c_ij[i]))
             self.c_ij[i] = list(set(self.c_ij[i]))
+        for j, concept in enumerate(self.c_ij[0]):
+            self.dc[concept] = (j, 0)
+        for j, concept in enumerate(self.c_ij[1]):
+            if concept in self.dc:
+                self.dc[concept] = (self.dc[concept][0], j)
+            else:
+                self.dc[concept] = (0, j)
         return self.c_ij, self.s_ik, self.l_ik, self.w_ij
 
 
@@ -276,50 +286,52 @@ class Comp_we(Comp_model):
         :return list[np.array]: size [j, k]
         """
         # build list pair concept
-        for j in range(len(self.c_ij[0])):
-            self.u_jk.append(np.zeros(len(self.c_ij[1]), float))
+        # for j in range(len(self.c_ij[0])):
+        # self.u_jk.append(np.zeros(len(self.c_ij[1]), float))
+        q = queue.Queue()
+        threads = []
+        for i in range(THREAD):
+            t = threading.Thread(target=self._evaluate_pair,
+                                 args=(q, threshold, ))
+            t.start()
+            threads.append(t)
+        for j, c_0 in enumerate(self.c_ij[0]):
+            for k, c_1 in enumerate(self.c_ij[1]):
+                tup = (
+                    (j, c_0),
+                    (k, c_1)
+                )
+                q.put(tup)
+
+        # block until all tasks are done
+        q.join()
+        # stop workers
+        for i in range(THREAD):
+            q.put(None)
+        for t in threads:
+            t.join()
         with open('pair_' + str(threshold), 'w') as f:
-            q = queue.Queue()
-            threads = []
-            for i in range(4):
-                t = threading.Thread(target=self._evaluate_pair,
-                                     args=(f, q, threshold, ))
-                t.start()
-                threads.append(t)
-            for j, c_0 in enumerate(self.c_ij[0]):
-                for k, c_1 in enumerate(self.c_ij[1]):
-                    tup = (
-                        (j, c_0),
-                        (k, c_1)
-                    )
-                    q.put(tup)
+            f.write(' '.join([j, k]) + '\t' + str(self.u_jk[(j, k)]) + '\n')
 
-            # block until all tasks are done
-            q.join()
-            # stop workers
-            for i in range(4):
-                q.put(None)
-            for t in threads:
-                t.join()
-
-    def _evaluate_pair(self, f, q, threshold):
+    def _evaluate_pair(self, q, threshold):
         """
         item = ((j, c_0), (k, c_1))
         """
         while True:
+            if q.qsize() % 10000 == 0:
+                print(q.qsize())
             item = q.get()
             c_0 = item[0][1]
             c_1 = item[1][1]
             j = item[0][0]
             k = item[1][0]
             sim = self._similarity(c_0, c_1)
+            # print(str(c_0) + '\n' + str(c_1) + '\n' + str(sim))
             if sim > threshold:
                 # self.u_jk[j][k] = sim
-                (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
+                self.u_jk[(j, k)] = (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
             # else:
                 # self.u_jk[j][k] = 0
-                f.write(' '.join(c_0) + '\t' + ' '.join(c_1)
-                        + '\t' + str(self.u_jk[j][k]) + '\n')
 
     def _similarity(self, c_0, c_1):
         if not isinstance(c_0, tuple):
@@ -354,19 +366,21 @@ def doc_to_str(l_sents):
 
 
 def read_concept_pair(file_name, c_ij):
-    u_jk = []
+    u_jk = {}
     with open(file_name, 'r') as f:
-        j = -1
-        k = -1
-        prev_concept = ''
+        # j = -1
+        # k = -1
+        # prev_concept = ''
         for line in f:
             pair = line.split('\t')
-            if prev_concept != pair[0]:
-                j += 1
-                k = 0
-                u_jk.append(np.zeros(len(c_ij[1]), float))
-            k += 1
-            u_jk[j][k] = pair[2]
+            j = pair[0].split()[0]
+            k = pair[0].split()[1]
+            # if prev_concept != pair[0]:
+            # j += 1
+            # k = 0
+            # u_jk.append(np.zeros(len(c_ij[1]), float))
+            # k += 1
+            u_jk[(j, k)] = pair[2]
     return u_jk
 
 
