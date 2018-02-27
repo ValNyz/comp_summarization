@@ -20,6 +20,7 @@ from collections import Counter
 from nltk.util import ngrams
 from nltk.corpus import wordnet as wn
 import numpy as np
+from copy import deepcopy
 from scipy.spatial.distance import cosine
 from model.wmd import word_mover_distance
 from globals import THREAD
@@ -32,6 +33,7 @@ class Comp_model(object):
     def __init__(self, l_sents):
         self.l_sents = l_sents
         self.typ = 'pos'
+        self.l_word = []
         self.d_concept = {}
         self.c_ij = []
         self.s_ik = []
@@ -69,12 +71,14 @@ class Comp_model(object):
                 for w in sent:
                     temp.append((w,))
                 # temp.extend(sent)
+                self.l_word.extend(set(sent))
                 self.d_concept[id(sent)] = (i, len(self.s_ik))
                 self.s_ik[i].append(temp)
                 self.l_ik[i].append(len(sent))
                 self.c_ij[i].extend(temp)
             self.w_ij.append(Counter(self.c_ij[i]))
             self.c_ij[i] = list(set(self.c_ij[i]))
+        self.l_word = list(set(self.l_word))
 
 
 class Comp_wordnet(Comp_model):
@@ -176,14 +180,14 @@ class Comp_we(Comp_model):
         :param threshold:
         :return list[np.array]: size [j, k]
         """
-        # build list pair concept
         # for j in range(len(self.c_ij[0])):
         # self.u_jk.append(np.zeros(len(self.c_ij[1]), float))
+        self._make_word_pair()
         q = JoinableQueue()
         threads = []
         for i in range(THREAD):
             t = Process(target=self._evaluate_pair,
-                        args=(q, threshold, ))
+                        args=(q, threshold))
             t.start()
             threads.append(t)
         for j, c_0 in enumerate(self.c_ij[0]):
@@ -206,37 +210,74 @@ class Comp_we(Comp_model):
         """
         item = ((j, c_0), (k, c_1))
         """
+        with self.lock:
+            pair_word = deepcopy(self.pair_word)
         while True:
             item = q.get()
             c_0 = item[0][1]
             c_1 = item[1][1]
             j = item[0][0]
             k = item[1][0]
-            sim = self._similarity(c_0, c_1)
+            if not isinstance(c_0, tuple):
+                c_0 = (c_0, )
+            if not isinstance(c_1, tuple):
+                c_1 = (c_1, )
+            sim = 0
+            for w_0 in c_0:
+                for w_1 in c_1:
+                    if (w_0, w_1) in pair_word:
+                        sim += pair_word[(w_0, w_1)]
+                    else:
+                        sim += pair_word[(w_1, w_0)]
+            sim = sim / (len(c_0) * len(c_1))
             # print(str(c_0) + '\n' + str(c_1) + '\n' + str(sim))
             if sim > threshold:
                 # self.u_jk[j][k] = sim
-                self.u_jk[(j, k)] = (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
+                with self.lock:
+                    self.u_jk[(j, k)] = (self.w_ij[0][c_0]+self.w_ij[1][c_1])/2
             # else:
                 # self.u_jk[j][k] = 0
             q.task_done()
 
-    def _similarity(self, c_0, c_1):
-        if not isinstance(c_0, tuple):
-            c_0 = (c_0, )
-        if not isinstance(c_1, tuple):
-            c_1 = (c_1, )
-        # print(c_0)
-        # print(c_1)
-        with self.lock:
-            list_sim = [cosine_similarity(self.model, w0, w1) for w0 in c_0
-                        for w1 in c_1]
-        best = sum(list_sim)/len(list_sim)
-        # print(best)
-        return best
+    def _similarity(self, q):
+        while True:
+            tup = q.get()
+            w_0 = tup[0]
+            w_1 = tup[1]
+            self.pair_word[tup] = cosine_similarity(self.model, w_0, w_1)
+            q.task_done()
+
+    def _make_word_pair(self):
+        self.pair_word = {}
+
+        q = JoinableQueue()
+        threads = []
+        for i in range(THREAD):
+            t = Process(target=self._similarity,
+                        args=(q, ))
+            t.start()
+            threads.append(t)
+        logger.info(str(len(self.l_word)) + ' unique words')
+        for i in range(len(self.l_word)):
+            for j in range(len(self.l_word)):
+                tup = (self.l_word[i], self.l_word[j])
+                # if len(self.l_word[i]) == 1:
+                # print(tup)
+                q.put(tup)
+
+        # block until all tasks are done
+        q.join()
+        # stop workers
+        for t in threads:
+            t.terminate()
+
+        logger.info('Done computing pair word similarity')
 
 
 class Comp_we_wmd(Comp_we):
+    """
+    Need update to Comp_we last modification
+    """
     def _similarity(self, c_0, c_1):
         if not isinstance(c_0, tuple):
             c_0 = (c_0, )
