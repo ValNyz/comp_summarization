@@ -7,13 +7,13 @@ Inspired by :
     Comparative News Summarization Using Linear Programming (Huang et al, 2011)
 __author__ : Valentin Nyzam
 """
-import ilp
+from model import comp_model
 import logging
 logger = logging.getLogger(__name__)
 
 
 def score_sentence_knapsack(*l_sents):
-    kp = ilp.Comp_Model_we('testWiki', l_sents)
+    kp = comp_model.Comp_we('testWiki', l_sents)
     kp.prepare()
     ocs_ikj = [[[1 if j in k else 0 for j in kp.c_ij[i]] for k in kp.s_ik[i]]
                for i in range(len(kp.c_ij))]

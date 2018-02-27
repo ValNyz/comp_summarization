@@ -1,10 +1,18 @@
 import browse_corpus
-import model.text as text
+from kmeans import kmeans
+import gensim
 
-sents_A, s_A = browse_corpus.load_sents('output/comp/C1801', 'C1801-A')
-sents_B, s_B = browse_corpus.load_sents('output/comp/C1801', 'C1801-B')
+s_A, sents_A = browse_corpus.load_sents('output/test/C1801', 'C1801-A')
+s_B, sents_B = browse_corpus.load_sents('output/test/C1801', 'C1801-B')
 
-# print(sents_A)
-doc_A = text.document(sents_A)
-print(doc_A)
-doc_B = text.document(sents_B)
+model_name = 'testWiki'
+
+sents = []
+sents.extend(s_A)
+sents.extend(s_B)
+model = gensim.models.Word2Vec.load(model_name)
+model.min_count = 0
+model.build_vocab(sents, update=True)
+model.train(sents, total_examples=len(sents),
+            epochs=model.epochs)
+kmeans(sents, 3, 0.0001, model)

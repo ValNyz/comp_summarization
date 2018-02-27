@@ -9,9 +9,6 @@ __author__ : Valentin Nyzam
 import time
 import os
 import browse_corpus
-from itertools import chain
-import gensim
-from kmeans import kmeans
 from knapsack import score_sentence_knapsack
 from ilp import score_sentence_ilp
 # from minimum_dominating_set import score_sentences_MDS
@@ -34,19 +31,9 @@ def make_comp_summary(data_path, corpus_id, summ_path, length, options):
     # load sents
     s_A, sents_A = browse_corpus.load_sents(data_path, corpus_id + '-A')
     s_B, sents_B = browse_corpus.load_sents(data_path, corpus_id + '-B')
-    model_name = 'testWiki'
 
-    sents = []
-    sents.extend(s_A)
-    sents.extend(s_B)
-    model = gensim.models.Word2Vec.load(model_name)
-    model.min_count = 0
-    model.build_vocab(sents, update=True)
-    model.train(sents, total_examples=len(sents),
-                epochs=model.epochs)
-    kmeans(chain(sents_A, sents_B), 10, 0.0001, model)
     # score_sentence_knapsack(sents_A, sents_B)
-    # score_sentence_ilp(sents_A, sents_B)
+    score_sentence_ilp(sents_A, sents_B)
     # score_sentences_MDS(sents_A, sents_B)
     # dict_sent_A, dict_sent_B = score_sentences_k_core(sents_A, sents_B, \
     #       score_sentence_by_word)

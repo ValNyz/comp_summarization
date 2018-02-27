@@ -7,7 +7,7 @@ __author__ : Valentin Nyzam
 
 import os
 
-THREAD = 8
+THREAD = len(os.sched_getaffinity(0))
 #ROOT = os.path.realpath(os.path.dirname(sys.argv[0])) + '/../'
 ROOT = '/home/arch/valnyz/python/comp_summarization'
 

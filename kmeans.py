@@ -13,8 +13,7 @@ import random
 # from collections import Counter
 from model.wmd import word_mover_distance
 from copy import deepcopy
-import threading
-import queue
+from multiprocessing import Process, Queue, JoinableQueue, Lock
 from globals import THREAD
 
 
@@ -96,7 +95,7 @@ class Cluster(object):
         '''
         # numPoints = len(self.points)
         # Get a list of all coordinates in this cluster
-        concepts = set([p for p in self.points])
+        concepts = [c for s in self.points for c in s]
         # Counter(self.points)
         # Reformat that so all x's are together, all y'z etc.
         # unzipped = zip(*coords)
@@ -110,48 +109,54 @@ class Cluster(object):
 
 
 def kmeans(points, k, cutoff, wvmodel):
-    points = [set(point) for point in points]
+    # points = [(point, ) for point in points]
     # Pick out k random points to use as our initial centroids
-    initial = random.sample(points, k)
+    initial = []
+    i = 0
+    while i != k:
+        random_index = random.randrange(0, len(points))
+        if random_index not in initial:
+            initial.append(random_index)
+            i += 1
 
     # Create k clusters using those centroids
     # Note: Cluster takes lists, so we wrap each point in a list here.
-    clusters = [Cluster(set(p), wvmodel) for p in initial]
+    clusters = [Cluster([points[p]], wvmodel) for p in initial]
 
     # Loop through the dataset until the clusters stabilize
     loopCounter = 0
     while True:
         # Create a list of lists to hold the points in each cluster
         lists = [[] for _ in clusters]
-
         # Start counting loops
         loopCounter += 1
         # For every point in the dataset ...
 
         # Make multithread
-        q = queue.Queue()
+        q = JoinableQueue()
+        d_q = Queue()
         threads = []
-        lock = threading.Lock()
+        lock = Lock()
         for i in range(THREAD):
             _clusters = deepcopy(clusters)
-            t = threading.Thread(target=_evaluate_point,
-                                 args=(q, lock, lists, _clusters,
-                                       wvmodel, ))
+            t = Process(target=_evaluate_point,
+                        args=(d_q, q, lock, _clusters,
+                              wvmodel))
             t.start()
             threads.append(t)
         for p in points:
             q.put(p)
 
-        # block until all tasks are done
         q.join()
-        # stop workers
-        for i in range(THREAD):
-            q.put(None)
-        for t in threads:
-            t.join()
 
-        for p in points:
-            q.put(p)
+        # stop workers
+        for t in threads:
+            t.terminate()
+
+        for _ in range(len(points)):
+            tup = d_q.get()
+            lists[int(tup[0])].append(tup[1])
+
         # Set our biggest_shift to zero for this iteration
         biggest_shift = 0.0
 
@@ -162,19 +167,24 @@ def kmeans(points, k, cutoff, wvmodel):
             # Keep track of the largest move from all cluster centroid updates
             biggest_shift = max(biggest_shift, shift)
 
-        print(clusters)
+        print('Iteration ' + str(loopCounter) + ' : ' + str(biggest_shift))
 
         # If the centroids have stopped moving much, say we're done!
         if biggest_shift < cutoff:
             print("Converged after %s iterations" % loopCounter)
             break
+
     return clusters
 
 
-def _evaluate_point(q, lock, lists, clusters, wvmodel):
+def _evaluate_point(d_q, q, lock, clusters, wvmodel):
     # Get the distance between that point and the centroid of the first
     # cluster.
     while True:
+        with lock:
+            if q.qsize() % 10 == 0:
+                print(q.qsize())
+
         p = q.get()
         smallest_distance = getDistance(p, clusters[0].centroid, wvmodel)
 
@@ -193,8 +203,9 @@ def _evaluate_point(q, lock, lists, clusters, wvmodel):
                 clusterIndex = i+1
         # After finding the cluster the smallest distance away
         # set the point to belong to that cluster
-        with lock:
-            lists[clusterIndex].append(p)
+        d_q.put((clusterIndex, p))
+
+        q.task_done()
 
 
 def euclidean_distance(a, b):
