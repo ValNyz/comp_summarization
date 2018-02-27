@@ -8,7 +8,11 @@ __author__ : Valentin Nyzam
 from itertools import product
 from collections import defaultdict
 from scipy.spatial.distance import euclidean
+import threading
 import pulp
+
+
+lock = threading.Lock()
 
 
 def word_mover_distance(first_sent_tokens, second_sent_tokens, wvmodel,
@@ -19,8 +23,9 @@ def word_mover_distance(first_sent_tokens, second_sent_tokens, wvmodel,
 
 
 def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
-    all_tokens = list(set(sent1+sent2))
-    wordvecs = {token: wvmodel[token] for token in all_tokens}
+    all_tokens = list(sent1 | sent2)
+    with lock:
+        wordvecs = {token: wvmodel[token] for token in all_tokens}
 
     buckets1 = _tokens_to_fracdict(sent1)
     buckets2 = _tokens_to_fracdict(sent2)

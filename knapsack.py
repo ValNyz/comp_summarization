@@ -42,36 +42,31 @@ def knapsack(l_sents, sumSize, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     :param s_ik:
     :param l_ik:
     """
+    lambd = 0.55
     # K = cube of (value, summary (as a list of tuple (as coordinate of
     # sentence)))
-    K = [[[[0, []] for w in range(sumSize + 1)]
-          for s1 in range(len(s_ik[1]) + 1)]
-         for s0 in range(len(s_ik[0]) + 1)]
+    K = [[[0, []] for w in range(sumSize + 1)]
+         for s in range(len(s_ik[0]) + len(s_ik[1]) + 1)]
 
-    for s0 in range(len(s_ik[0]) + 1):
-        for s1 in range(len(s_ik[1]) + 1):
-            for w in range(sumSize + 1):
-                if s0 == 0 and s1 == 0 or w == 0:
-                    # K[s0][s1][w] = (0, [])
-                    pass
-                elif s0 != 0 and s1 == 0:
-                    K[s0][s1][w] = K[s0-1][len(s_ik[1])][w]
-                    print_summary(l_sents, K[s0-1][len(s_ik[1])][w])
-                elif l_ik[0][s0-1] + l_ik[1][s1-1] <= w:
-                    current_sum = list(K[s0][s1-1]
-                                        [w-l_ik[0][s0-1]-l_ik[1][s1-1]]
-                                        [1])
-                    current_sum.append((0, s0-1))
-                    current_sum.append((1, s1-1))
-                    value = obj(0.55, ocs_ikj, w_ij, u_jk, current_sum)
-                    if value > K[s0][s1-1][w][0]:
-                        K[s0][s1][w][0] = value
-                        K[s0][s1][w][1] = current_sum
-                    else:
-                        K[s0][s1][w] = K[s0][s1-1][w]
+    limit_c0 = len(s_ik[0])+1
+    for s in range(len(s_ik[0]) + len(s_ik[1] + 1)):
+        for w in range(sumSize + 1):
+            c = 0 if s < limit_c0 else 1
+            s = s if c == 0 else s-limit_c0
+            if s == 0 and c == 0 or w == 0:
+                pass
+            elif l_ik[c][s-1] <= w:
+                current_sum = list(K[s-1][w-l_ik[c][s-1][1]])
+                current_sum.append((c, s))
+                value = obj(lambd, ocs_ikj, w_ij, u_jk, current_sum)
+                if value > K[s-1][w][0]:
+                    K[s][w][0] = value
+                    K[s][w][1] = current_sum
                 else:
-                    K[s0][s1][w] = K[s0][s1-1][w]
-    return K[len(s_ik[0])][len(s_ik[1])][sumSize+1]
+                    K[s][w] = K[s-1][w]
+            else:
+                K[s][w] = K[s-1][w]
+    return K[len(K)][sumSize+1]
 
 
 def obj(lambd, ocs_ikj, w_ij, u_jk, summary):
