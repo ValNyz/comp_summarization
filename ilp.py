@@ -19,6 +19,7 @@ import numpy as np
 from scipy.spatial.distance import cosine
 from model.wmd import word_mover_distance
 from globals import THREAD
+from globals import WE_MODEL
 import pulp
 from pulp import lpSum
 import logging
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 def score_sentence_ilp(*l_sents):
-    ilp = Comp_we('testWiki', l_sents)
+    ilp = Comp_we(WE_MODEL, l_sents)
     ilp.prepare()
     docs = []
     p_doc_name = ""
@@ -318,8 +319,8 @@ class Comp_we(Comp_model):
         item = ((j, c_0), (k, c_1))
         """
         while True:
-            if q.qsize() % 10000 == 0:
-                print(q.qsize())
+            # if q.qsize() % 10000 == 0:
+                # print(q.qsize())
             item = q.get()
             c_0 = item[0][1]
             c_1 = item[1][1]

@@ -17,3 +17,4 @@ TOOLS_ROOT = os.path.join(ROOT, 'tools')
 
 STOPWORDS = os.path.join(DATA_ROOT, 'stopwords.english')
 BERKELEY_PARSER_CMD = '%s/parser_bin/distribute.sh %s/parser_bin/berkeleyParser+Postagger.sh' %(TOOLS_ROOT, TOOLS_ROOT)
+WE_MODEL = '/home/nyzam/data/wikipedia/enwiki-20171001-model.bin'
