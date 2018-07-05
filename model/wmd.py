@@ -8,7 +8,11 @@ __author__ : Valentin Nyzam
 from itertools import product
 from collections import defaultdict
 from scipy.spatial.distance import euclidean
+# import threading
 import pulp
+
+
+# lock = threading.Lock()
 
 
 def word_mover_distance(first_sent_tokens, second_sent_tokens, wvmodel,
@@ -19,7 +23,8 @@ def word_mover_distance(first_sent_tokens, second_sent_tokens, wvmodel,
 
 
 def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
-    all_tokens = list(set(sent1+sent2))
+    all_tokens = list(set().union(sent1, sent2))
+    # with lock:
     wordvecs = {token: wvmodel[token] for token in all_tokens}
 
     buckets1 = _tokens_to_fracdict(sent1)
@@ -30,9 +35,11 @@ def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
                               lowBound=0)
 
     prob = pulp.LpProblem('WMD', sense=pulp.LpMinimize)
+    # with lock:
     prob += pulp.lpSum([T[token1, token2]
                         * euclidean(wordvecs[token1], wordvecs[token2])
-                        for token1, token2 in product(all_tokens, all_tokens)])
+                        for token1, token2 in product(all_tokens,
+                                                      all_tokens)])
     for token2 in buckets2:
         prob += pulp.lpSum([T[token1, token2] for token1 in
                             buckets1]) == buckets2[token2]

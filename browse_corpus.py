@@ -19,6 +19,7 @@ class Sentence:
         self.id = id
         self.order = order
         self.orig = orig
+        self.len = len(tok.split())
         self.tok = [word for word in tp.remove_punct(tok).split()
                     if len(word) > 0]
         self.pos = pos.split()
@@ -47,7 +48,7 @@ class Sentence:
         self.atleast = ""
 
     def __len__(self):
-        return len(self.tok2)
+        return self.len
 
     def __iter__(self):
         return iter(self.tok2)
@@ -61,8 +62,11 @@ class Sentence:
     def __str__(self):
         return self.orig
 
+    def __repr__(self):
+        return self.__str__()
 
-def load_sents(input_path, corpus_id):
+
+def load_sents(input_path, corpus_id, encoding='utf-8'):
     """
     Load sentence from input path for the corpus "corpus_id"
     :param input_path: str: input path for the topic files
@@ -72,15 +76,15 @@ def load_sents(input_path, corpus_id):
     :return: list: list of Sentence: [Sentence]
     """
     data_path = os.path.join(input_path, corpus_id)
-    orig_fh = open(data_path + '.sent')
+    orig_fh = open(data_path + '.sent', encoding=encoding)
     # tok_fh = open(data_path + '.sent.tok')
-    tok_fh = open(data_path + '.sent.tok.lemm')
-    pos_fh = open(data_path + '.sent.tok.lemm.pos')
-    doc_fh = open(data_path + '.doc')
-    par_fh = open(data_path + '.par')
+    tok_fh = open(data_path + '.sent.tok.lemm', encoding=encoding)
+    pos_fh = open(data_path + '.sent.tok.lemm.pos', encoding=encoding)
+    doc_fh = open(data_path + '.doc', encoding=encoding)
+    par_fh = open(data_path + '.par', encoding=encoding)
     parse_fh = None
     if os.path.exists(data_path + '.sent.tok.parsed'):
-        parse_fh = open(data_path + '.sent.tok.parsed')
+        parse_fh = open(data_path + '.sent.tok.parsed', encoding=encoding)
 
     sents = []
     count = 0

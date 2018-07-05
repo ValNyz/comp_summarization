@@ -46,12 +46,13 @@ def get_files(path, pattern):
 
     contents = os.listdir(path)
     for item in contents:
-        item = os.path.join(path, item)
-        if re.search(pattern, os.path.basename(item)) is not None \
-           and os.path.isfile(item):
-            L.append(item)
-        elif os.path.isdir(path):
-            L.extend(get_files(item, pattern))
+        if item != "global":
+            item = os.path.join(path, item)
+            if re.search(pattern, os.path.basename(item)) is not None \
+               and os.path.isfile(item):
+                L.append(item)
+            elif os.path.isdir(path):
+                L.extend(get_files(item, pattern))
 
     return L
 

@@ -54,19 +54,21 @@ class SummaryProblem:
         self.docs_A = []
         self.docs_A = []
         for path in self.docs_A_paths:
+            print(path)
             doc = text.Document(path)
             doc.get_sentences()
             self.docs_A.append(doc)
 
         self.docs_B = []
         for path in self.docs_B_paths:
+            print(path)
             doc = text.Document(path)
             doc.get_sentences()
             self.docs_B.append(doc)
 
         self.loaded_docs = True
 
-    def dump_data(self, path):
+    def dump_data(self, path, encoding='utf-8'):
         path = os.path.join(path, self.id)
         os.mkdir(path)
 
@@ -79,13 +81,18 @@ class SummaryProblem:
         doc_file = '.doc'
         par_file = '.par'
 
-        sent_fh = open(os.path.join(path, self.id + "-A" + sent_file), 'w')
-        tok_fh = open(os.path.join(path, self.id + "-A" + tok_file), 'w')
-        lemm_fh = open(os.path.join(path, self.id + "-A" + lemm_file), 'w')
-        lemm_pos_fh = open(os.path.join(path, self.id + "-A" + lemm_pos_file),
-                           'w')
-        doc_fh = open(os.path.join(path, self.id + "-A" + doc_file), 'w')
-        par_fh = open(os.path.join(path, self.id + "-A" + par_file), 'w')
+        sent_fh = open(os.path.join(path, self.id + "-A" + sent_file), 'w',
+                       encoding=encoding)
+        tok_fh = open(os.path.join(path, self.id + "-A" + tok_file), 'w',
+                       encoding=encoding)
+        lemm_fh = open(os.path.join(path, self.id + "-A" + lemm_file), 'w',
+                       encoding=encoding)
+        lemm_pos_fh = open(os.path.join(path, self.id + "-A" + lemm_pos_file), 'w',
+                       encoding=encoding)
+        doc_fh = open(os.path.join(path, self.id + "-A" + doc_file), 'w',
+                       encoding=encoding)
+        par_fh = open(os.path.join(path, self.id + "-A" + par_file), 'w',
+                       encoding=encoding)
         for doc in self.docs_A:
             # count = 0
             for sent in doc.sentences:
@@ -105,19 +112,24 @@ class SummaryProblem:
         lemm_pos_fh.close()
         doc_fh.close()
         par_fh.close()
-        sent_fh = open(os.path.join(path, self.id + "-B" + sent_file), 'w')
-        tok_fh = open(os.path.join(path, self.id + "-B" + tok_file), 'w')
-        lemm_fh = open(os.path.join(path, self.id + "-B" + lemm_file), 'w')
-        lemm_pos_fh = open(os.path.join(path, self.id + "-B" + lemm_pos_file),
-                           'w')
-        doc_fh = open(os.path.join(path, self.id + "-B" + doc_file), 'w')
-        par_fh = open(os.path.join(path, self.id + "-B" + par_file), 'w')
+        sent_fh = open(os.path.join(path, self.id + "-B" + sent_file), 'w',
+                       encoding=encoding)
+        tok_fh = open(os.path.join(path, self.id + "-B" + tok_file), 'w',
+                       encoding=encoding)
+        lemm_fh = open(os.path.join(path, self.id + "-B" + lemm_file), 'w',
+                       encoding=encoding)
+        lemm_pos_fh = open(os.path.join(path, self.id + "-B" + lemm_pos_file), 'w',
+                       encoding=encoding)
+        doc_fh = open(os.path.join(path, self.id + "-B" + doc_file), 'w',
+                       encoding=encoding)
+        par_fh = open(os.path.join(path, self.id + "-B" + par_file), 'w',
+                       encoding=encoding)
         for doc in self.docs_B:
             # count = 0
             for sent in doc.sentences:
                 # cleaning
                 if sent.original[0:2].islower():
-                    print('bad parse:', sent.original)
+                    print('bad parse:', sent.original.encode(encoding))
                     continue
                 sent_fh.write('%s\n' % sent.original)  # % cleaned)
                 tok_fh.write('%s\n' % ' '.join(sent.tokens))
@@ -158,7 +170,8 @@ def setup_task(task):
     # get all document data
     all_docs = {}
     logger.debug(task.doc_path)
-    files = util.get_files(task.doc_path, r'[^_]+_?[^_]*_?\d+[\.\-]\d+')
+    files = util.get_files(task.doc_path,
+                                    r'[^_]+_?[^_]*_?\d+[\.\-]\d+')
     logger.debug(files)
     sys.stderr.write('Loading [%d] files\n' % len(files))
     for file in files:

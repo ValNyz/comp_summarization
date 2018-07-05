@@ -1,6 +1,7 @@
 #!/bin/bash
-DOCS=/home/arch/valnyz/PhD/data/comparative
-REF=/home/arch/valnyz/PhD/data/comparative
+#DOCS=/home/nyzam/data/TAC2008/UpdateSumm08_test_docs_files
+DOCS=/home/nyzam/data/comparative/eval_doc
+REF=/home/nyzam/data/comparative/model_sum
 TASK=$1
 OUTPUT="output/$TASK/"
 #export PYTHONPATH=splitta:$PYTHONPATH

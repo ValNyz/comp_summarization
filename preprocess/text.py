@@ -17,7 +17,8 @@ import string
 # import _stopwords
 
 from nltk import SnowballStemmer
-from nltk.tokenize.moses import MosesTokenizer
+from nltk.tokenize.toktok import ToktokTokenizer
+# from nltk.tokenize.moses import MosesTokenizer
 # from nltk.corpus import stopwords
 from treetagger.treetagger import TreeTagger
 
@@ -28,7 +29,8 @@ from globals import STOPWORDS
 class TextProcessor:
     def __init__(self):
         # self._no_punct_pattern = re.compile('[a-zA-Z0-9- ]')
-        self._tok = MosesTokenizer(lang='en')
+        self._tok = ToktokTokenizer()
+        # self._tok = MosesTokenizer(lang='en')
         self._stemmer = SnowballStemmer('english')
         self._lemmatizer = TreeTagger(language='english')
         self._stopwords = set(open(STOPWORDS).read().splitlines())
@@ -45,7 +47,7 @@ class TextProcessor:
         return nltk.sent_tokenize(text, language='english')
 
     def tokenize(self, text):
-        return self._tok.tokenize(text, escape=False)
+        return self._tok.tokenize(text) #, escape=False)
 
     def porter_stem(self, word):
         return self._porter_stemmer.stem(word)
@@ -296,7 +298,7 @@ class Document:
             for sentence in parser.parsed:
                 sentence.parsed = parser.parsed[sentence]
 
-    def __init__(self, path, is_clean=False):
+    def __init__(self, path, is_clean=False, encoding='utf-8'):
         """
         path is the location of the file to process
         is_clean=True means that file has no XML or other markup: just text
@@ -309,7 +311,7 @@ class Document:
 
         # get generic info
         if os.path.isfile(path):
-            rawdata = open(path).read()
+            rawdata = open(path, encoding=encoding).read()
         elif path.strip().startswith('<DOC>'):
             rawdata = path
         else:
