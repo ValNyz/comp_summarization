@@ -9,7 +9,7 @@ __author__ : Valentin Nyzam
 """
 from model import comp_model
 from globals import WE_MODEL
-import idf
+# import idf
 import logging
 logger = logging.getLogger(__name__)
 
@@ -26,23 +26,15 @@ def score_sentence_knapsack(*l_sents):
         kp.w_ij[0][concept] = kp.w_ij[0][concept]*dict_idf[concept]
     for concept in kp.w_ij[1].keys():
         kp.w_ij[1][concept] = kp.w_ij[1][concept]*dict_idf[concept]
-    
-    id_summary = []
-    for i in range(len(l_sents)): 
-        print('Summary ' + str(i))
-        id_summary.append(knapsack(i, 100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk,
-                                  kp.s_ik, kp.l_ik))
-    # id_summary = knapsack(200, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk,
-                          # kp.s_ik, kp.l_ik)
 
-    # print(id_summary)
-    summary = []
-    for j in range(len(id_summary)):
-        summary.append([l_sents[j][i[1]] for i in id_summary[j] if i[0] == j])
-    # summary_A = [l_sents[0][i[1]] for i in id_summary if i[0] == 0]
-    # summary_B = [l_sents[1][i[1]] for i in id_summary if i[0] == 1]
+    # id_summary = []
+    id_sum_A, id_sum_B = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk,
+                                     kp.s_ik, kp.l_ik)
 
-    return summary[0], summary[1]
+    summary_A = [l_sents[0][i[1]] for i in id_sum_A if i[0] == 0]
+    summary_B = [l_sents[1][i[1]] for i in id_sum_B if i[0] == 1]
+
+    return summary_A, summary_B
 
 
 # A Dynamic Programming based Python Program for 0-1 Knapsack problem
@@ -86,6 +78,7 @@ def knapsack(i, sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
                 K[s][w] = K[s-1][w]
     return K[len(K)-1][sumSize][1]
 
+
 # A Dynamic Programming based Python Program for 0-1 Knapsack problem
 # Returns the maximum value that can be put in a knapsack of capacity W
 def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
@@ -102,60 +95,93 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     lambd = 0.55
     # K = cube of (value, summary (as a list of tuple (as coordinate of
     # sentence)))
+    i_max = (0, 1)[len(s_ik[0]) > len(s_ik[1])]
+    i_min = (1, 0)[i_max]
+
+    K_0 = [[[0, []] for w in range(sumSize + 1)]
+           for s in range(len(s_ik[i_max]) + 1)]
     K_1 = [[[0, []] for w in range(sumSize + 1)]
-         for s in range(len(s_ik[0]) + 1)]
-    K_2 = [[[0, []] for w in range(sumSize + 1)]
-         for s in range(len(s_ik[1]) + 1)]
-    K = []
-    K.append(K_1)
-    K.append(K_2)
+           for s in range(len(s_ik[i_min]) + 1)]
 
     max_size = max(len(s_ik[0]), len(s_ik[1]))
 
     for w in range(sumSize + 1):
         for size in range(len(max_size)):
-            for s_0 in range(min(size, len(s_ik[0]))):
-                cor = 0
-                sen = s_0-1
-                if s_0 == 0 or w == 0:
-                    pass
-                elif l_ik[cor][sen] <= w:
-                    current_sum = list(K_0[sen-1][w-l_ik[cor][sen]][1])
-                    current_sum.append((cor, sen))
-                    sum_1 = list(K_1[min(size, len(s_ik[1]))][w]
-                    value = obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum,
-                               sum_1)
-                    if value > K_0[s-1][w][0]:
-                        K_0[s][w][0] = value
-                        K_0[s][w][1] = current_sum
-                    else:
-                        K_0[s][w] = K_0[s-1][w]
-                else:
-                    K[s][w] = K[s-1][w]
-                    
-            for s_1 in range(min(size, len(s_ik[1]))):
-                if s_1 == 0 or w == 0:
-                    pass
+            main_knapsack(K_0, K_1, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
+                          s_ik, l_ik)
+            main_knapsack(K_1, K_0, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
+                          s_ik, l_ik)
 
-    for s in range(len(s_ik[0]) + len(s_ik[1]) + 1):
-        c = 0 if s < limit_c0 else 1
-        sen = s-1 if c == 0 else s-limit_c0
-        logger.debug((c, sen))
-        for w in range(sumSize + 1):
-            if s == 0 and c == 0 or w == 0:
-                pass
-            elif l_ik[c][sen] <= w:
-                current_sum = list(K[s-1][w-l_ik[c][sen]][1])
-                current_sum.append((c, sen))
-                value = obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum)
-                if value > K[s-1][w][0]:
-                    K[s][w][0] = value
-                    K[s][w][1] = current_sum
-                else:
-                    K[s][w] = K[s-1][w]
+    if i_max == 1:
+        return K_1[len(K_1)-1][sumSize][1], K_0[len(K_0)-1][sumSize][1]
+    else:
+        return K_0[len(K_0)-1][sumSize][1], K_1[len(K_1)-1][sumSize][1]
+
+
+def main_knapsack(K_0, K_1, w, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
+                  s_ik, l_ik):
+    # K_0 = K[0]
+    # K_1 = K[1]
+
+    for s_0 in range(min(size, len(K_0) - 1)):
+        cor = 0
+        sen = s_0 - 1
+        if s_0 == 0 or w == 0:
+            pass
+        elif l_ik[cor][sen] <= w:
+            current_sum = list(K_0[sen-1][w-l_ik[cor][sen]][1])
+            current_sum.append((cor, sen))
+            sum_1 = list(K_1[min(size, sen-1)][w])
+            value = bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum,
+                                 sum_1)
+            if value > K_0[sen-1][w][0]:
+                K_0[sen][w][0] = value
+                K_0[sen][w][1] = current_sum
             else:
-                K[s][w] = K[s-1][w]
-    return K[len(K)-1][sumSize][1]
+                K_0[sen][w] = K_0[sen-1][w]
+        else:
+            K_0[sen][w] = K_0[sen-1][w]
+
+
+def bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, sum_0, sum_1):
+    """
+    Evaluate comparative summary sum_0, knowing it'll be compare to sum_1
+    """
+    comp = 0.
+    rep = 0.
+
+    lc_0 = set()
+    lc_1 = set()
+
+    for sen in sum_0:
+        if sen[0] == 0:
+            for concept in ocs_ikj[0][sen[1]]:
+                lc_0.add(concept[0])
+                # if concept[1] is not None:
+                # lc_1.add(concept[1])
+        else:
+            pass
+    for sen in sum_1:
+        if sen[0] == 1:
+            for concept in ocs_ikj[1][sen[1]]:
+                lc_1.add(concept[1])
+                # if concept[0] is not None:
+                # lc_0.add(concept[0])
+        else:
+            pass
+
+    t_rep = False
+
+    for c_0 in lc_0:
+        rep += w_ij[0][c_ij[0][c_0]]
+        for c_1 in lc_1:
+            if not t_rep:
+                rep += w_ij[1][c_ij[1][c_1]]
+            if (c_0, c_1) in u_jk:
+                # logger.info("COMP!!")
+                comp += u_jk[(c_0, c_1)]
+        t_rep = True
+    return lambd*comp + (1-lambd)*rep
 
 
 def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
@@ -164,9 +190,9 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
     # print(w_ij[0])
     comp = 0.
     rep = 0.
-    lc = []
+    # lc = []
     # for _ in range(nbDoc):
-        # lc.append(set())
+    # lc.append(set())
     lc_0 = set()
     lc_1 = set()
     for sen in summary:
@@ -188,12 +214,12 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
     # print(lc_1)
     t_rep = False
     # for i, lc_i in enumerate(lc):
-        # for c_i in lc_i:
-            # rep += w_ij[i][c_ij[i][c_i]]
-            # for j in range(i, len(lc)):
-                # for c_j in lc[j]:
-                    # if (c_i, c_j) in u_jk:
-                        # comp += u_jk[(c_0, c_1)]
+    # for c_i in lc_i:
+    # rep += w_ij[i][c_ij[i][c_i]]
+    # for j in range(i, len(lc)):
+    # for c_j in lc[j]:
+    # if (c_i, c_j) in u_jk:
+    # comp += u_jk[(c_0, c_1)]
     for c_0 in lc_0:
         rep += w_ij[0][c_ij[0][c_0]]
         for c_1 in lc_1:
