@@ -28,8 +28,7 @@ def score_sentence_knapsack(*l_sents):
         kp.w_ij[1][concept] = kp.w_ij[1][concept]*dict_idf[concept]
 
     # id_summary = []
-    id_sum_A, id_sum_B = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk,
-                                     kp.s_ik, kp.l_ik)
+    id_sum_A, id_sum_B = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik, kp.l_ik)
 
     summary_A = [l_sents[0][i[1]] for i in id_sum_A if i[0] == 0]
     summary_B = [l_sents[1][i[1]] for i in id_sum_B if i[0] == 1]
@@ -106,32 +105,30 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     max_size = max(len(s_ik[0]), len(s_ik[1]))
 
     for w in range(sumSize + 1):
-        for size in range(len(max_size)):
-            main_knapsack(K_0, K_1, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
-                          s_ik, l_ik)
-            main_knapsack(K_1, K_0, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
-                          s_ik, l_ik)
+        logger.info("Iteration " + str(w))
+        for size in range(max_size):
+            main_knapsack(K_0, K_1, i_max, w, size, lambd, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik)
+            main_knapsack(K_1, K_0, i_min, w, size, lambd, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik)
 
     if i_max == 1:
-        return K_1[len(K_1)-1][sumSize][1], K_0[len(K_0)-1][sumSize][1]
+        return K_1[len(K_1)-1][sumSize], K_0[len(K_0)-1][sumSize]
     else:
-        return K_0[len(K_0)-1][sumSize][1], K_1[len(K_1)-1][sumSize][1]
+        return K_0[len(K_0)-1][sumSize], K_1[len(K_1)-1][sumSize]
 
 
-def main_knapsack(K_0, K_1, w, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
+def main_knapsack(K_0, K_1, cor, w, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
                   s_ik, l_ik):
     # K_0 = K[0]
     # K_1 = K[1]
 
     for s_0 in range(min(size, len(K_0) - 1)):
-        cor = 0
         sen = s_0 - 1
         if s_0 == 0 or w == 0:
             pass
         elif l_ik[cor][sen] <= w:
             current_sum = list(K_0[sen-1][w-l_ik[cor][sen]][1])
-            current_sum.append((cor, sen))
-            sum_1 = list(K_1[min(size, sen-1)][w])
+            current_sum.append(sen)
+            sum_1 = list(K_1[min(len(K_1)-1, sen-1)][w])
             value = bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum,
                                  sum_1)
             if value > K_0[sen-1][w][0]:
@@ -154,17 +151,15 @@ def bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, sum_0, sum_1):
     lc_1 = set()
 
     for sen in sum_0:
-        if sen[0] == 0:
-            for concept in ocs_ikj[0][sen[1]]:
-                lc_0.add(concept[0])
+        for concept in ocs_ikj[0][sen]:
+            lc_0.add(concept[0])
                 # if concept[1] is not None:
                 # lc_1.add(concept[1])
         else:
             pass
     for sen in sum_1:
-        if sen[0] == 1:
-            for concept in ocs_ikj[1][sen[1]]:
-                lc_1.add(concept[1])
+        for concept in ocs_ikj[1][sen]:
+            lc_1.add(concept[1])
                 # if concept[0] is not None:
                 # lc_0.add(concept[0])
         else:

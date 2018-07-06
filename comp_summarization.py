@@ -105,12 +105,12 @@ if __name__ == '__main__':
                                                               'summary'),
                                                  options.length, options)
 
-        with open(os.path.join(options.outpath, 'summary', c_id + ".sum"), 'w') as f:
+        with open(os.path.join(options.outpath, 'summary', c_id + "-A.sum"), 'w') as f:
             for sent in summary_A:
                 f.write(str(sent) + '\n')
                 print(sent)
-            print()
-            f.write('\n')
+        print()
+        with open(os.path.join(options.outpath, 'summary', c_id + "-B.sum"), 'w') as f:
             for sent in summary_B:
                 f.write(str(sent) + '\n')
                 print(sent)
