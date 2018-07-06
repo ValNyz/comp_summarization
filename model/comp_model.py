@@ -82,6 +82,8 @@ class Comp_model(object):
         for j, c_1 in enumerate(self.c_ij[1]):
             if c_1 in self.d_concept:
                 self.d_concept[c_1] = (self.d_concept[c_1][0], j)
+                # logger.info("COMP!!!!")
+                # print("FOUND")
             else:
                 self.d_concept[c_1] = (None, j)
 
@@ -114,7 +116,7 @@ class Comp_wordnet(Comp_model):
         threshold = 0.2
         if os.path.exists(self.save_name + str(threshold) + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(threshold))
+                                                str(threshold) + '.model')
         else:
             self._make_concept_pair(threshold)
             logger.info('Write concept pair similarity in ' + self.save_name)
@@ -211,7 +213,7 @@ class Comp_we(Comp_model):
         threshold = 0.3
         if os.path.exists(self.save_name + str(threshold) + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(threshold))
+                                                str(threshold) + '.model')
         else:
             self._make_concept_pair()
             logger.info('Write concept pair similarity in ' + self.save_name)
@@ -373,7 +375,7 @@ class Comp_cluster(Comp_we):
         threshold = 0.2
         if os.path.exists(self.save_name + str(threshold) + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(threshold))
+                                                str(threshold) + '.model')
 
         else:
             from kmeans import kmeans
