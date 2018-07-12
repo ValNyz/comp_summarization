@@ -105,6 +105,8 @@ if __name__ == '__main__':
                                                               'summary'),
                                                  options.length, options)
 
+        os.makedirs(os.path.join(options.outpath, 'summary'), exist_ok=True)
+
         with open(os.path.join(options.outpath, 'summary', c_id + "-A.sum"), 'w') as f:
             for sent in summary_A:
                 f.write(str(sent) + '\n')

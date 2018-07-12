@@ -37,7 +37,7 @@ def score_sentence_ilp(*l_sents):
         ilp.w_ij[0][concept] = ilp.w_ij[0][concept]*dict_idf[concept]
     for concept in ilp.w_ij[1].keys():
         ilp.w_ij[1][concept] = ilp.w_ij[1][concept]*dict_idf[concept]
-    return generate_ilp_problem(l_sents, ilp.c_ij, ilp.w_ij, ilp.u_jk,
+    return solve_ilp_problem(l_sents, ilp.c_ij, ilp.w_ij, ilp.u_jk,
                                 ilp.s_ik, ilp.l_ik)
 
 
@@ -54,7 +54,7 @@ def solve_ilp_problem(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik):
     list of concept
     """
     logger.info("Generate ILP problem")
-    prob = generate_ilp_problem(l_sents, c_ij, u_jk, s_ik, l_ik)
+    prob = generate_bi_ilp_program(l_sents, c_ij, w_ij, u_jk, s_ik, l_ik)
 
     # The problem data is written to an .lp file
     # prob.writeLP("comp_ilp.lp")

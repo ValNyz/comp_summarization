@@ -10,6 +10,10 @@ __author__ : Valentin Nyzam
 from model import comp_model
 from globals import WE_MODEL
 # import idf
+
+from random import shuffle
+import time
+import cProfile
 import logging
 logger = logging.getLogger(__name__)
 
@@ -27,11 +31,16 @@ def score_sentence_knapsack(*l_sents):
     for concept in kp.w_ij[1].keys():
         kp.w_ij[1][concept] = kp.w_ij[1][concept]*dict_idf[concept]
 
-    # id_summary = []
-    id_sum_A, id_sum_B = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik, kp.l_ik)
+    cp = cProfile.Profile()
+    cp.enable()
+    id_summary = bi_knapsack(50, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik,
+                             kp.l_ik)
+    cp.disable()
+    cp.print_stats()
+    # id_sum_A,id_sum_B = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik, kp.l_ik)
 
-    summary_A = [l_sents[0][i[1]] for i in id_sum_A if i[0] == 0]
-    summary_B = [l_sents[1][i[1]] for i in id_sum_B if i[0] == 1]
+    summary_A = [l_sents[0][i[1]] for i in id_summary if i[0] == 0]
+    summary_B = [l_sents[1][i[1]] for i in id_summary if i[0] == 1]
 
     return summary_A, summary_B
 
@@ -94,6 +103,72 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     lambd = 0.55
     # K = cube of (value, summary (as a list of tuple (as coordinate of
     # sentence)))
+    K = [[[ [0, []] for w2 in range(sumSize + 1)]
+                        for w1 in range(sumSize + 1)]
+         for s in range(len(s_ik[0]) + len(s_ik[1]) + 1)]
+
+    l_sen = []
+    for s in range(len(s_ik[0])):
+        l_sen.append((0, s))
+    for s in range(len(l_ik[1])):
+        l_sen.append((1, s))
+    shuffle(l_sen)
+    
+    s_0 = 0
+    s_1 = 0
+
+
+
+    for w_0 in range(sumSize + 1):
+        logger.info("Iteration " + str(w_0))
+        start = time.process_time()
+        for w_1 in range(sumSize + 1):
+            for i, sen_tup in enumerate(l_sen):
+                cor = sen_tup[0]
+                sen = sen_tup[1]
+                if i == 0 or w_0 == 0 or w_1 == 0:
+                    pass
+                elif cor == 0 and l_ik[cor][sen] <= w_0:
+                    current_sum = list(K[i-1][w_0-l_ik[cor][sen]][w_1][1])
+                    current_sum.append(sen_tup)
+                    value = obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum)
+                    if value > K[i-1][w_0][w_1][0]:
+                        K[i][w_0][w_1][0] = value
+                        K[i][w_0][w_1][1] = current_sum
+                    else:
+                        K[i][w_0][w_1] = K[i-1][w_0][w_1]
+                elif cor == 1 and l_ik[cor][sen] <= w_1:
+                    current_sum = list(K[i-1][w_0][w_1-l_ik[cor][sen]][1])
+                    current_sum.append(sen_tup)
+                    value = obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum)
+                    if value > K[i-1][w_0][w_1][0]:
+                        K[i][w_0][w_1][0] = value
+                        K[i][w_0][w_1][1] = current_sum
+                    else:
+                        K[i][w_0][w_1] = K[i-1][w_0][w_1]
+                else:
+                    K[i][w_0][w_1] = K[i-1][w_0][w_1]
+        logger.info(str(time.process_time() - start))
+    return K[len(K)-1][sumSize][sumSize][1]
+
+
+
+# A Dynamic Programming based Python Program for 0-1 Knapsack problem
+# Returns the maximum value that can be put in a knapsack of capacity W
+def bi_knapsack_costly(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
+    """knapsack
+
+    :param l_sents:
+    :param sumSize:
+    :param ocs_ikj:
+    :param w_ij:
+    :param u_jk:
+    :param s_ik:
+    :param l_ik:
+    """
+    lambd = 0.55
+    # K = cube of (value, summary (as a list of tuple (as coordinate of
+    # sentence)))
     i_max = (0, 1)[len(s_ik[0]) > len(s_ik[1])]
     i_min = (1, 0)[i_max]
 
@@ -128,7 +203,7 @@ def main_knapsack(K_0, K_1, cor, w, size, lambd, c_ij, ocs_ikj, w_ij, u_jk,
         elif l_ik[cor][sen] <= w:
             current_sum = list(K_0[sen-1][w-l_ik[cor][sen]][1])
             current_sum.append(sen)
-            sum_1 = list(K_1[min(len(K_1)-1, sen-1)][w])
+            sum_1 = list(K_1[min(len(K_1)-1, sen-1)][w][1])
             value = bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum,
                                  sum_1)
             if value > K_0[sen-1][w][0]:
@@ -196,13 +271,13 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
         if sen[0] == 0:
             for concept in ocs_ikj[0][sen[1]]:
                 lc_0.add(concept[0])
-                if concept[1] is not None:
-                    lc_1.add(concept[1])
+                # if concept[1] is not None:
+                    # lc_1.add(concept[1])
         elif sen[0] == 1:
             for concept in ocs_ikj[1][sen[1]]:
                 lc_1.add(concept[1])
-                if concept[0] is not None:
-                    lc_0.add(concept[0])
+                # if concept[0] is not None:
+                    # lc_0.add(concept[0])
         else:
             pass
     # print(lc_0)
@@ -223,5 +298,6 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
             if (c_0, c_1) in u_jk:
                 # logger.info("COMP!!")
                 comp += u_jk[(c_0, c_1)]
-        t_rep = True
+        if not t_rep:
+            t_rep = True
     return lambd*comp + (1-lambd)*rep
