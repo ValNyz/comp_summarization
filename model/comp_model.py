@@ -6,7 +6,7 @@ Comparative News Summarization Using Linear Programming (Huang et al, 2011)
 __author__ : Valentin Nyzam
 """
 
-from time import sleep, msleep
+from time import sleep
 import os
 
 # import queue
@@ -53,7 +53,7 @@ class Comp_model(object):
         if os.path.exists(self.save_name + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name + '.model')
         else:
-            self._make_concept_pair(self.threshold)
+            self._make_concept_pair()
             logger.info('Write concept pair similarity in ' + self.save_name)
             with open(self.save_name + '.model', 'w', encoding='utf-8') as f:
                 for tup in self.u_jk.keys():
@@ -270,7 +270,7 @@ def _evaluate_pair_word(model, w_ij, q, done_q, similarity, threshold):
             done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
             q.task_done()
         except queue.Empty:
-            msleep(1)
+            sleep(0.001)
             pass
 
 
@@ -293,7 +293,7 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
             done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
             q.task_done()
         except queue.Empty:
-            msleep(1)
+            sleep(0.001)
             pass
 
 
