@@ -19,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 
 def score_sentence_knapsack(*l_sents):
-    kp = comp_model.Comp_we(WE_MODEL, l_sents)
+    # kp = comp_model.Comp_wordnet(l_sents)
+    # kp = comp_model.Comp_we(WE_MODEL, l_sents)
+
     kp.prepare()
     ocs_ikj = [[[kp.d_concept[c] for c in sen] for sen in kp.s_ik[doc]]
                for doc in range(len(kp.c_ij))]
@@ -31,14 +33,14 @@ def score_sentence_knapsack(*l_sents):
     for concept in kp.w_ij[1].keys():
         kp.w_ij[1][concept] = kp.w_ij[1][concept]*dict_idf[concept]
 
-    cp = cProfile.Profile()
-    cp.enable()
-    id_summary = bi_knapsack(50, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik,
+    # cp = cProfile.Profile()
+    # cp.enable()
+    id_summary = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik,
                              kp.l_ik)
-    cp.disable()
-    cp.print_stats()
+    # cp.disable()
+    # cp.print_stats()
     # id_sum_A,id_sum_B = bi_knapsack(100, kp.c_ij, ocs_ikj, kp.w_ij, kp.u_jk, kp.s_ik, kp.l_ik)
-
+    print(id_summary)
     summary_A = [l_sents[0][i[1]] for i in id_summary if i[0] == 0]
     summary_B = [l_sents[1][i[1]] for i in id_summary if i[0] == 1]
 
@@ -117,38 +119,42 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     s_0 = 0
     s_1 = 0
 
-
-
     for w_0 in range(sumSize + 1):
         logger.info("Iteration " + str(w_0))
         start = time.process_time()
         for w_1 in range(sumSize + 1):
-            for i, sen_tup in enumerate(l_sen):
-                cor = sen_tup[0]
-                sen = sen_tup[1]
+            for i in range(len(l_sen) + 1):
                 if i == 0 or w_0 == 0 or w_1 == 0:
                     pass
-                elif cor == 0 and l_ik[cor][sen] <= w_0:
+                cor = l_sen[i-1][0]
+                sen = l_sen[i-1][1]
+                if cor == 0 and l_ik[cor][sen] <= w_0:
                     current_sum = list(K[i-1][w_0-l_ik[cor][sen]][w_1][1])
-                    current_sum.append(sen_tup)
+                    current_sum.append(l_sen[i-1])
                     value = obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum)
                     if value > K[i-1][w_0][w_1][0]:
+                        # print(value)
+                        # print(current_sum)
                         K[i][w_0][w_1][0] = value
                         K[i][w_0][w_1][1] = current_sum
                     else:
                         K[i][w_0][w_1] = K[i-1][w_0][w_1]
                 elif cor == 1 and l_ik[cor][sen] <= w_1:
                     current_sum = list(K[i-1][w_0][w_1-l_ik[cor][sen]][1])
-                    current_sum.append(sen_tup)
+                    current_sum.append(l_sen[i-1])
                     value = obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, current_sum)
                     if value > K[i-1][w_0][w_1][0]:
+                        # print(value)
+                        # print(current_sum)
                         K[i][w_0][w_1][0] = value
                         K[i][w_0][w_1][1] = current_sum
                     else:
                         K[i][w_0][w_1] = K[i-1][w_0][w_1]
                 else:
                     K[i][w_0][w_1] = K[i-1][w_0][w_1]
+                # print(K[i][w_0][w_1])
         logger.info(str(time.process_time() - start))
+    # print(K[len(l_sen)-1])
     return K[len(K)-1][sumSize][sumSize][1]
 
 
@@ -222,7 +228,7 @@ def bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, sum_0, sum_1):
     comp = 0.
     rep = 0.
 
-    lc_0 = set()
+    lc_0 = set() 
     lc_1 = set()
 
     for sen in sum_0:
@@ -230,15 +236,11 @@ def bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, sum_0, sum_1):
             lc_0.add(concept[0])
                 # if concept[1] is not None:
                 # lc_1.add(concept[1])
-        else:
-            pass
     for sen in sum_1:
         for concept in ocs_ikj[1][sen]:
             lc_1.add(concept[1])
                 # if concept[0] is not None:
                 # lc_0.add(concept[0])
-        else:
-            pass
 
     t_rep = False
 
@@ -263,23 +265,28 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
     # lc = []
     # for _ in range(nbDoc):
     # lc.append(set())
-    lc_0 = set()
-    lc_1 = set()
+    lc_0 = []
+    lc_1 = []
     for sen in summary:
         # sen = (i, k)
         # print(sen)
         if sen[0] == 0:
+            # lc_0.extend(ocs_ikj[0][sen[1]])
             for concept in ocs_ikj[0][sen[1]]:
-                lc_0.add(concept[0])
+                lc_0.append(concept[0])
                 # if concept[1] is not None:
                     # lc_1.add(concept[1])
         elif sen[0] == 1:
+            # lc_1.extend(ocs_ikj[1][sen[1]])
             for concept in ocs_ikj[1][sen[1]]:
-                lc_1.add(concept[1])
+                lc_1.append(concept[1])
                 # if concept[0] is not None:
                     # lc_0.add(concept[0])
         else:
             pass
+
+    sc_0 = set(lc_0)
+    sc_1 = set(lc_1)
     # print(lc_0)
     # print(lc_1)
     t_rep = False
@@ -290,9 +297,9 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
     # for c_j in lc[j]:
     # if (c_i, c_j) in u_jk:
     # comp += u_jk[(c_0, c_1)]
-    for c_0 in lc_0:
+    for c_0 in sc_0:
         rep += w_ij[0][c_ij[0][c_0]]
-        for c_1 in lc_1:
+        for c_1 in sc_1:
             if not t_rep:
                 rep += w_ij[1][c_ij[1][c_1]]
             if (c_0, c_1) in u_jk:
@@ -301,3 +308,4 @@ def obj(lambd, c_ij, ocs_ikj, w_ij, u_jk, summary):
         if not t_rep:
             t_rep = True
     return lambd*comp + (1-lambd)*rep
+

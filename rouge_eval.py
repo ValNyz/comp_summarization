@@ -60,7 +60,8 @@ def write_settings_xml(peer_path, output_path, model_relative_path,
         models = ET.Element("MODELS")
         i = 0
         for file in os.listdir(os.path.join(output_path, model_relative_path)):
-            prog = re.compile(corpus_name[:5] + corpus_name[-2:])
+            prog = re.compile(corpus_name[:7] + ".sum")
+            # prog = re.compile(corpus_name[:5] + corpus_name[-2:])
             if (prog.match(file) is not None):
                 model_summary = ET.Element("M")
                 model_summary.set("ID", str(i))
@@ -91,7 +92,8 @@ def execute_rouge(rouge_path, peer_path, model_path, output_path):
         write_generated_summary(os.path.join(output_path, "Peer"),
                                 summary, summary_sent)
         for file in os.listdir(model_path):
-            prog = re.compile(summary[:5] + summary[-2:])
+            prog = re.compile(summary[:7] + ".sum")
+            # prog = re.compile(summary[:5] + summary[-2:])
             if (prog.match(file) is not None):
                 print("Loading models : " + file)
                 model_sent = []

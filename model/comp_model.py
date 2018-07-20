@@ -110,6 +110,7 @@ class Comp_wordnet(Comp_model):
         self.save_name = 'pair_wordnet_' + l_sents[0][0].corpus[:-2] + '_'
         self.eval = _evaluate_pair_word
         self.sim = _relevance_wordnet
+        self.model = None
 
     def prepare(self):
         Comp_model.prepare(self)
@@ -146,14 +147,15 @@ class Comp_wordnet(Comp_model):
         threads = []
         for i in range(THREAD):
             t = Process(target=self.eval,
-                        args=(self.w_ij, q, done_q, self.sim, threshold))
+                        args=(self.model, self.w_ij, q, done_q,
+                              self.sim, threshold))
             t.start()
             threads.append(t)
 
         t = Process(target=_print_progress, args=(q, done_q))
         t.start()
         threads.append(t)
-        
+        logger.info(str(len(self.c_ij[0])*len(self.c_ij[1])) + ' concept pairs to test')
         for j, c_0 in enumerate(self.c_ij[0]):
             for k, c_1 in enumerate(self.c_ij[1]):
                 tup = (
@@ -162,17 +164,28 @@ class Comp_wordnet(Comp_model):
                 )
                 q.put(tup)
         logger.info('Queuing complete')
+        # block until all pair are processed.
+        q.join()
         print(done_q.qsize())
+        counter_dq = 0
+        tempo = 0
+        # while counter_dq < len(self.u_jk):
         while not q.empty() or not done_q.empty():
             try:
                 tup = done_q.get()
                 j = tup[0][0]
                 k = tup[0][1]
                 self.u_jk[(j, k)] = tup[1]
+                counter_dq += 1
+                tempo += 1
+                if tempo % 1000 == 0:
+                    tempo = 0
+                    logger.info(str(counter_dq) + " pair already processed.")
+                done_q.task_done()
             except queue.Empty:
                 pass
-        # block until all tasks are done
-        q.join()
+        logger.info("Processing complete")
+
         # stop workers
         for t in threads:
             t.terminate()
@@ -182,7 +195,7 @@ class Comp_wordnet(Comp_model):
         logger.info('Nb pair : ' + str(len(self.u_jk)))
 
 
-def _relevance_wordnet(w_0, w_1):
+def _relevance_wordnet(model, w_0, w_1):
     allsyns1 = set(ss for ss in wn.synsets(w_0))
 #[0],
  #                                          pos=transform_POS(w_0[1])))
@@ -275,6 +288,7 @@ class Comp_we(Comp_model):
         logger.info('Queuing complete')
         # print(done_q.qsize())
         counter_dq = 0
+        # while counter_dq < len(self.u_jk):
         while not q.empty() or not done_q.empty():
             try:
                 tup = done_q.get()
@@ -355,7 +369,7 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
 class Comp_we_wmd(Comp_we):
     def __init__(self, model_name, l_sents):
         Comp_model.__init__(self, l_sents)
-        self.save_name = 'pair_wmd' + l_sents[0][0].corpus[:-2] + '_'
+        self.save_name = 'pair_we_wmd' + l_sents[0][0].corpus[:-2] + '_'
         self.eval = _evaluate_pair_concept
         self.sim = word_mover_distance
         self._update_model(model_name)

@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 def score_sentence_ilp(*l_sents):
-    ilp = comp_model.Comp_we(WE_MODEL, l_sents)
+    ilp = comp_model.Comp_wordnet(l_sents)
+    # ilp = comp_model.Comp_we(WE_MODEL, l_sents)
     ilp.prepare()
     # docs = []
     # p_doc_name = ""
