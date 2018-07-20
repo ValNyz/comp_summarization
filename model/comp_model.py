@@ -6,7 +6,7 @@ Comparative News Summarization Using Linear Programming (Huang et al, 2011)
 __author__ : Valentin Nyzam
 """
 
-from time import sleep
+from time import sleep, msleep
 import os
 
 # import queue
@@ -182,6 +182,8 @@ class Comp_model(object):
         for t in threads:
             t.terminate()
 
+        done_q.join()
+
         logger.info('Verify nb pair : ')
         logger.info('Nb pair : ' + str(counter_dq))
         logger.info('Nb pair : ' + str(len(self.u_jk)))
@@ -249,23 +251,27 @@ def _evaluate_pair_word(model, w_ij, q, done_q, similarity, threshold):
     item = ((j, c_0), (k, c_1))
     """
     while True:
-        item = q.get()
-        c_0 = item[0][1]
-        c_1 = item[1][1]
-        j = item[0][0]
-        k = item[1][0]
-        if not isinstance(c_0, tuple):
-            c_0 = (c_0, )
-        if not isinstance(c_1, tuple):
-            c_1 = (c_1, )
-        sim = 0
-        for w_0 in c_0:
-            for w_1 in c_1:
-                cos = similarity(model, w_0, w_1)
-                sim += cos
-        sim = sim / (len(c_0) * len(c_1))
-        done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
-        q.task_done()
+        try:
+            item = q.get()
+            c_0 = item[0][1]
+            c_1 = item[1][1]
+            j = item[0][0]
+            k = item[1][0]
+            if not isinstance(c_0, tuple):
+                c_0 = (c_0, )
+            if not isinstance(c_1, tuple):
+                c_1 = (c_1, )
+            sim = 0
+            for w_0 in c_0:
+                for w_1 in c_1:
+                    cos = similarity(model, w_0, w_1)
+                    sim += cos
+            sim = sim / (len(c_0) * len(c_1))
+            done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
+            q.task_done()
+        except queue.Empty:
+            msleep(1)
+            pass
 
 
 def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
@@ -273,18 +279,22 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
     item = ((j, c_0), (k, c_1))
     """
     while True:
-        item = q.get()
-        c_0 = item[0][1]
-        c_1 = item[1][1]
-        j = item[0][0]
-        k = item[1][0]
-        if not isinstance(c_0, tuple):
-            c_0 = (c_0, )
-        if not isinstance(c_1, tuple):
-            c_1 = (c_1, )
-        sim = similarity(model, c_0, c_1)
-        done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
-        q.task_done()
+        try:
+            item = q.get()
+            c_0 = item[0][1]
+            c_1 = item[1][1]
+            j = item[0][0]
+            k = item[1][0]
+            if not isinstance(c_0, tuple):
+                c_0 = (c_0, )
+            if not isinstance(c_1, tuple):
+                c_1 = (c_1, )
+            sim = similarity(model, c_0, c_1)
+            done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
+            q.task_done()
+        except queue.Empty:
+            msleep(1)
+            pass
 
 
 class Comp_we_wmd(Comp_we):
