@@ -29,8 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 class Comp_model(object):
-    def __init__(self, l_sents):
+    def __init__(self, l_sents, threshold=0.4):
         self.l_sents = l_sents
+        self.threshold = threshold
         self.typ = 'word'
         self.pair_word = {}
         self.d_concept = {}
@@ -114,14 +115,13 @@ class Comp_wordnet(Comp_model):
 
     def prepare(self):
         Comp_model.prepare(self)
-        threshold = 0.2
-        if os.path.exists(self.save_name + str(threshold) + '.model'):
+        if os.path.exists(self.save_name + str(self.threshold) + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(threshold) + '.model')
+                                                str(self.threshold) + '.model')
         else:
-            self._make_concept_pair(threshold)
+            self._make_concept_pair(self.threshold)
             logger.info('Write concept pair similarity in ' + self.save_name)
-            with open(self.save_name + str(threshold) + '.model', 'w', encoding='utf-8') as f:
+            with open(self.save_name + str(self.threshold) + '.model', 'w', encoding='utf-8') as f:
                 for tup in self.u_jk.keys():
                     j = tup[0]
                     k = tup[1]
@@ -223,14 +223,13 @@ class Comp_we(Comp_model):
 
     def prepare(self):
         Comp_model.prepare(self)
-        threshold = 0.3
-        if os.path.exists(self.save_name + str(threshold) + '.model'):
+        if os.path.exists(self.save_name + str(self.threshold) + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(threshold) + '.model')
+                                                str(self.threshold) + '.model')
         else:
-            self._make_concept_pair()
+            self._make_concept_pair(self.threshold)
             logger.info('Write concept pair similarity in ' + self.save_name)
-            with open(self.save_name + str(threshold) + '.model', 'w', encoding='utf-8') as f:
+            with open(self.save_name + str(self.threshold) + '.model', 'w', encoding='utf-8') as f:
                 for tup in self.u_jk.keys():
                     j = tup[0]
                     k = tup[1]
@@ -251,7 +250,7 @@ class Comp_we(Comp_model):
         self.model.train(sents, total_examples=len(sents),
                          epochs=self.model.epochs)
 
-    def _make_concept_pair(self, threshold=0.2):
+    def _make_concept_pair(self, threshold):
         """_make_dict_concept_pair
         :param c_ij:
         :param w_ij:
