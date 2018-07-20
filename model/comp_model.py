@@ -32,6 +32,7 @@ class Comp_model(object):
     def __init__(self, l_sents, threshold=0.4):
         self.l_sents = l_sents
         self.threshold = threshold
+        self.save_name = None
         self.typ = 'word'
         self.pair_word = {}
         self.d_concept = {}
@@ -40,13 +41,28 @@ class Comp_model(object):
         self.s_ik = []
         self.l_ik = []
         self.w_ij = []
-        self.u_jk = {}
+        self.u_jk = {}  # weight for pair jk
+        self.s_jk = {}  # sim for pair jk
 
     def prepare(self):
         self._make_concept()
         print("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
         print("Nb concept in doc 0 : " + str(len(self.c_ij[0])))
         print("Nb concept in doc 1 : " + str(len(self.c_ij[1])))
+
+        if os.path.exists(self.save_name + '.model'):
+            self.u_jk = self._read_concept_pair(self.save_name + '.model')
+        else:
+            self._make_concept_pair(self.threshold)
+            logger.info('Write concept pair similarity in ' + self.save_name)
+            with open(self.save_name + '.model', 'w', encoding='utf-8') as f:
+                for tup in self.u_jk.keys():
+                    j = tup[0]
+                    k = tup[1]
+                    f.write(' '.join(self.c_ij[0][j]) + '\t' +
+                            ' '.join(self.c_ij[1][k]) + '\t' +
+                            str(self.u_jk[tup]) + '\t' +
+                            str(self.s_jk[tup]) + '\n')
 
     def _make_concept(self, order=2):
         """_make_concept
@@ -101,41 +117,16 @@ class Comp_model(object):
                     continue
                 j = self.d_concept[tuple(c_0.split())][0]
                 k = self.d_concept[tuple(c_1.split())][1]
-                u_jk[(j, k)] = float(pair[2].rstrip())
+                if float(pair[3].rstrip()) > self.threshold:
+                    u_jk[(j, k)] = float(pair[2].rstrip())
         return u_jk
 
-
-class Comp_wordnet(Comp_model):
-    def __init__(self, l_sents):
-        Comp_model.__init__(self, l_sents)
-        self.save_name = 'pair_wordnet_' + l_sents[0][0].corpus[:-2] + '_'
-        self.eval = _evaluate_pair_word
-        self.sim = _relevance_wordnet
-        self.model = None
-
-    def prepare(self):
-        Comp_model.prepare(self)
-        if os.path.exists(self.save_name + str(self.threshold) + '.model'):
-            self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(self.threshold) + '.model')
-        else:
-            self._make_concept_pair(self.threshold)
-            logger.info('Write concept pair similarity in ' + self.save_name)
-            with open(self.save_name + str(self.threshold) + '.model', 'w', encoding='utf-8') as f:
-                for tup in self.u_jk.keys():
-                    j = tup[0]
-                    k = tup[1]
-                    f.write(' '.join(self.c_ij[0][j]) + '\t' +
-                            ' '.join(self.c_ij[1][k]) + '\t' +
-                            str(self.u_jk[tup]) + '\n')
-
-    def _make_concept_pair(self, threshold):
+    def _make_concept_pair(self):
         """make_dict_concept_pair
         :param c_ij:
         :param w_ij:
         :param similarity: similarity function: input(concept, concept):
             ouput(0<int<1)
-        :param threshold:
         :return list[np.array]: size [j, k]
         """
         q = JoinableQueue()
@@ -148,14 +139,15 @@ class Comp_wordnet(Comp_model):
         for i in range(THREAD):
             t = Process(target=self.eval,
                         args=(self.model, self.w_ij, q, done_q,
-                              self.sim, threshold))
+                              self.sim, self.threshold))
             t.start()
             threads.append(t)
 
         t = Process(target=_print_progress, args=(q, done_q))
         t.start()
         threads.append(t)
-        logger.info(str(len(self.c_ij[0])*len(self.c_ij[1])) + ' concept pairs to test')
+        logger.info(str(len(self.c_ij[0])*len(self.c_ij[1]))
+                    + ' concept pairs to test')
         for j, c_0 in enumerate(self.c_ij[0]):
             for k, c_1 in enumerate(self.c_ij[1]):
                 tup = (
@@ -166,20 +158,20 @@ class Comp_wordnet(Comp_model):
         logger.info('Queuing complete')
         # block until all pair are processed.
         q.join()
-        print(done_q.qsize())
+
         counter_dq = 0
-        tempo = 0
         # while counter_dq < len(self.u_jk):
         while not q.empty() or not done_q.empty():
             try:
                 tup = done_q.get()
                 j = tup[0][0]
                 k = tup[0][1]
+
                 self.u_jk[(j, k)] = tup[1]
+                self.s_jk[(j, k)] = tup[2]
+
                 counter_dq += 1
-                tempo += 1
-                if tempo % 1000 == 0:
-                    tempo = 0
+                if counter_dq % 1000 == 0:
                     logger.info(str(counter_dq) + " pair already processed.")
                 done_q.task_done()
             except queue.Empty:
@@ -195,14 +187,18 @@ class Comp_wordnet(Comp_model):
         logger.info('Nb pair : ' + str(len(self.u_jk)))
 
 
+class Comp_wordnet(Comp_model):
+    def __init__(self, l_sents):
+        Comp_model.__init__(self, l_sents)
+        self.save_name = 'pair_wordnet_' + l_sents[0][0].corpus[:-2] + '_'
+        self.eval = _evaluate_pair_word
+        self.sim = _relevance_wordnet
+        self.model = None
+
+
 def _relevance_wordnet(model, w_0, w_1):
     allsyns1 = set(ss for ss in wn.synsets(w_0))
-#[0],
- #                                          pos=transform_POS(w_0[1])))
     allsyns2 = set(ss for ss in wn.synsets(w_1) if ss not in allsyns1)
-#[0],
-  #                                         pos=transform_POS(w_1[1]))
-                   # if ss not in allsyns1)
 
     if len(allsyns1) == 0 or len(allsyns2) == 0:
         return 0
@@ -221,22 +217,6 @@ class Comp_we(Comp_model):
         self.sim = cosine_similarity
         self._update_model(model_name)
 
-    def prepare(self):
-        Comp_model.prepare(self)
-        if os.path.exists(self.save_name + str(self.threshold) + '.model'):
-            self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(self.threshold) + '.model')
-        else:
-            self._make_concept_pair(self.threshold)
-            logger.info('Write concept pair similarity in ' + self.save_name)
-            with open(self.save_name + str(self.threshold) + '.model', 'w', encoding='utf-8') as f:
-                for tup in self.u_jk.keys():
-                    j = tup[0]
-                    k = tup[1]
-                    f.write(' '.join(self.c_ij[0][j]) + '\t' +
-                            ' '.join(self.c_ij[1][k]) + '\t' +
-                            str(self.u_jk[tup]) + '\n')
-
     def _update_model(self, model_name):
         """_update_model
         update word embeddings model on self.l_sents for unseen word
@@ -249,62 +229,6 @@ class Comp_we(Comp_model):
         self.model.build_vocab(sents, update=True)
         self.model.train(sents, total_examples=len(sents),
                          epochs=self.model.epochs)
-
-    def _make_concept_pair(self, threshold):
-        """_make_dict_concept_pair
-        :param c_ij:
-        :param w_ij:
-        :param similarity: similarity function: input(concept, concept):
-            ouput(0<int<1)
-        :param threshold:
-        :return list[np.array]: size [j, k]
-        """
-        q = JoinableQueue()
-        done_q = Queue()
-
-        # manager = Manager()
-        # pair_word = manager.dict()
-
-        threads = []
-        for i in range(THREAD):
-            t = Process(target=self.eval,
-                        args=(self.model, self.w_ij, q, done_q,
-                              self.sim, threshold))
-            t.start()
-            threads.append(t)
-
-        t = Process(target=_print_progress, args=(q, done_q))
-        t.start()
-        threads.append(t)
-        logger.info(str(len(self.c_ij[0])*len(self.c_ij[1])) + ' concept pairs to test')
-        for j, c_0 in enumerate(self.c_ij[0]):
-            for k, c_1 in enumerate(self.c_ij[1]):
-                tup = (
-                    (j, c_0),
-                    (k, c_1)
-                )
-                q.put(tup)
-        logger.info('Queuing complete')
-        # print(done_q.qsize())
-        counter_dq = 0
-        # while counter_dq < len(self.u_jk):
-        while not q.empty() or not done_q.empty():
-            try:
-                tup = done_q.get()
-                j = tup[0][0]
-                k = tup[0][1]
-                self.u_jk[(j, k)] = tup[1]
-                counter_dq += 1
-            except queue.Empty:
-                pass
-        # block until all tasks are done
-        q.join()
-        # stop workers
-        for t in threads:
-            t.terminate()
-        logger.info('Verify nb pair : ')
-        logger.info('Nb pair : ' + str(counter_dq))
-        logger.info('Nb pair : ' + str(len(self.u_jk)))
 
 
 def _print_progress(q, done_q):
@@ -340,8 +264,7 @@ def _evaluate_pair_word(model, w_ij, q, done_q, similarity, threshold):
                 cos = similarity(model, w_0, w_1)
                 sim += cos
         sim = sim / (len(c_0) * len(c_1))
-        if sim > threshold:
-            done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2))
+        done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
         q.task_done()
 
 
@@ -360,8 +283,7 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
         if not isinstance(c_1, tuple):
             c_1 = (c_1, )
         sim = similarity(model, c_0, c_1)
-        if sim > threshold:
-            done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2))
+        done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
         q.task_done()
 
 
@@ -403,8 +325,7 @@ class Comp_cluster(Comp_we):
                             ' '.join(self.c_ij[1][k]) + '\t' +
                             str(self.u_jk[tup]) + '\n')
 
-
-    def _make_concept_pair(self, threshold=0.0):
+    def _make_concept_pair(self):
         q = JoinableQueue()
         done_q = Queue()
 
@@ -412,10 +333,10 @@ class Comp_cluster(Comp_we):
         for i in range(THREAD):
             t = Process(target=_evaluate_pair_word,
                         args=(self.model, self.w_ij, q, done_q, self.sim,
-                              threshold))
+                              self.threshold))
             t.start()
             threads.append(t)
-        
+
         t = Process(target=_print_progress, args=(q, ))
         t.start()
         threads.append(t)
