@@ -16,9 +16,10 @@ from globals import WE_MODEL
 logger = logging.getLogger(__name__)
 
 
-def score_sentence_ilp(*l_sents):
-    ilp = comp_model.Comp_wordnet(l_sents)
-    # ilp = comp_model.Comp_we(WE_MODEL, l_sents)
+def score_sentence_ilp(model, threshold, *l_sents):
+    ilp = model
+    # ilp = comp_model.Comp_wordnet(l_sents, threshold)
+    # ilp = comp_model.Comp_we(WE_MODEL, l_sents, threshold)
     ilp.prepare()
     # docs = []
     # p_doc_name = ""

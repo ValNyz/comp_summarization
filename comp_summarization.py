@@ -9,6 +9,8 @@ __author__ : Valentin Nyzam
 import time
 import os
 import browse_corpus
+from model import comp_model
+from globals import WE_MODEL
 from knapsack import score_sentence_knapsack
 from ilp import score_sentence_ilp
 from minimum_dominating_set import score_sentences_MDS
@@ -27,14 +29,28 @@ def score_sentence_by_word(sent, dict):
     return 0 if len(list) == 0 else sum(list)/len(list)
 
 
-def make_comp_summary(data_path, corpus_id, summ_path, length, options):
+def make_comp_summary(comparative, model, threshold,
+                      data_path, corpus_id, summ_path, length, options):
     # load sents
     s_A, sents_A = browse_corpus.load_sents(data_path, corpus_id + '-A')
     s_B, sents_B = browse_corpus.load_sents(data_path, corpus_id + '-B')
 
     start = time.process_time()
-    summary_A, summary_B = score_sentence_knapsack(sents_A, sents_B)
-    # summary_A, summary_B = score_sentence_ilp(sents_A, sents_B)
+    c_model = None
+    summary_A, summary_B = None, None
+    l_sents = [sents_A, sents_B]
+    if model == 'WordNet':
+        c_model = comp_model.Comp_wordnet(l_sents, threshold)
+    elif model == 'WE':
+        c_model = comp_model.Comp_we(WE_MODEL, l_sents, threshold)
+    elif model == 'WE_WMD':
+        c_model = comp_model.Comp_we_wmd(WE_MODEL, l_sents, threshold)
+    
+    if comparative == 'knapsack':
+        summary_A, summary_B = score_sentence_knapsack(c_model, threshold, sents_A, sents_B)
+    elif comparative == 'ilp':
+        summary_A, summary_B = score_sentence_ilp(c_model, threshold, sents_A, sents_B)
+
     # summary_A, summary_B = score_sentences_MDS(sents_A, sents_B)
     # dict_sent_A, dict_sent_B = score_sentences_k_core(sents_A, sents_B, \
     #       score_sentence_by_word)
@@ -67,12 +83,16 @@ def parse_options():
     usage = 'usage: %prog [options]'
     parser = OptionParser(usage=usage)
 
-    parser.add_option('-t', '--task', dest='task', type='str',
+    parser.add_option('-t', '--threshold', dest='threshold', type='float',
+                      help='threshold for selection of comparative pair')
+    parser.add_option('-k', '--task', dest='task', type='str',
                       help='task name')
     parser.add_option('--docpath', dest='docpath', type='str',
                       help='source document path')
-    parser.add_option('--manpath', dest='manpath', type='str',
-                      help='manual summary path')
+    parser.add_option('-m', '--model',  dest='model', type='str',
+                      help='model type (WordNet, WE, WE_WMD, Cluster)')
+    parser.add_option('-c', '--comparative',  dest='comparative', type='str',
+                      help='comparative method (ILP, Knapsack)')
     parser.add_option('-l', '--length', dest='length', type='int',
                       help='maximum number of words in summaries', default=100)
     parser.add_option('-i', '--input-path', dest='inputpath', type='str',
@@ -85,34 +105,40 @@ def parse_options():
                       help='character encoding of text input')
     return parser.parse_args()
 
-
 if __name__ == '__main__':
     options, task = parse_options()
+    task = options.task
+
+    path = os.path.join('output', task)
 
     start = time.process_time()
 
-    os.popen('mkdir -p %s' % os.path.join(options.outpath, 'summary'))
+    # os.popen('mkdir -p %s' % os.path.join(options.outpath, 'summary'))
+    os.popen('mkdir -p %s' % os.path.join(path, 'summary'))
     # run through all corpus
-    for c_id in os.listdir(options.inputpath):
+    for c_id in os.listdir(path):
         if 'summary' in c_id or 'rouge_settings.xml' in c_id or 'Model' in c_id or 'Peer' in c_id:
             continue
         # new output
         print(c_id)
 
-        summary_A, summary_B = make_comp_summary(os.path.join(options.outpath,
-                                                              c_id), c_id,
-                                                 os.path.join(options.outpath,
-                                                              'summary'),
+        summary_A, summary_B = make_comp_summary(options.comparative, options.model,
+                                                 options.threshold,
+                                                 os.path.join(path, c_id), c_id,
+                                                 os.path.join(path, 'summary'),
                                                  options.length, options)
 
-        os.makedirs(os.path.join(options.outpath, 'summary'), exist_ok=True)
+        os.makedirs(os.path.join(path, 'summary', options.comparative + '_' +
+                               options.model, str(options.threshold)), exist_ok=True)
 
-        with open(os.path.join(options.outpath, 'summary', c_id + "-A.sum"), 'w') as f:
+        with open(os.path.join(path, 'summary', options.comparative + '_' +
+                               options.model, str(options.threshold), c_id + "-A.sum"), 'w') as f:
             for sent in summary_A:
                 f.write(str(sent) + '\n')
                 print(sent)
         print()
-        with open(os.path.join(options.outpath, 'summary', c_id + "-B.sum"), 'w') as f:
+        with open(os.path.join(path, 'summary', options.comparative + '_' +
+                               options.model, str(options.threshold), c_id + "-B.sum"), 'w') as f:
             for sent in summary_B:
                 f.write(str(sent) + '\n')
                 print(sent)

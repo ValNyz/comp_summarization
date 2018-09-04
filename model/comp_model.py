@@ -26,10 +26,14 @@ from globals import THREAD
 
 import logging
 logger = logging.getLogger(__name__)
+fh = logging.FileHandler(__name__ + ".log")
+fh.setLevel(logging.DEBUG)
+
+logger.addHandler(fh)
 
 
 class Comp_model(object):
-    def __init__(self, l_sents, threshold=0.4):
+    def __init__(self, l_sents, threshold=0.7):
         self.l_sents = l_sents
         self.threshold = threshold
         self.save_name = None
@@ -146,8 +150,8 @@ class Comp_model(object):
         t = Process(target=_print_progress, args=(q, done_q))
         t.start()
         threads.append(t)
-        logger.info(str(len(self.c_ij[0])*len(self.c_ij[1]))
-                    + ' concept pairs to test')
+        size = len(self.c_ij[0]) * len(self.c_ij[1])
+        logger.info(str(size) + ' concept pairs to test')
         for j, c_0 in enumerate(self.c_ij[0]):
             for k, c_1 in enumerate(self.c_ij[1]):
                 tup = (
@@ -160,8 +164,8 @@ class Comp_model(object):
         q.join()
 
         counter_dq = 0
-        # while counter_dq < len(self.u_jk):
-        while not q.empty() or not done_q.empty():
+        while counter_dq < size: 
+        # while not q.empty() or not done_q.empty():
             try:
                 tup = done_q.get()
                 j = tup[0][0]
@@ -171,10 +175,12 @@ class Comp_model(object):
                 self.s_jk[(j, k)] = tup[2]
 
                 counter_dq += 1
-                if counter_dq % 1000 == 0:
-                    logger.info(str(counter_dq) + " pair already processed.")
-                done_q.task_done()
+                # if counter_dq % 1000 == 0:
+                    # logger.info(str(counter_dq) + " pair already processed.")
+                # done_q.task_done()
             except queue.Empty:
+                logger.info("Done_q is empty")
+                sleep(0.1)
                 pass
         logger.info("Processing complete")
 
@@ -182,7 +188,7 @@ class Comp_model(object):
         for t in threads:
             t.terminate()
 
-        done_q.join()
+        # done_q.join()
 
         logger.info('Verify nb pair : ')
         logger.info('Nb pair : ' + str(counter_dq))
@@ -190,9 +196,12 @@ class Comp_model(object):
 
 
 class Comp_wordnet(Comp_model):
-    def __init__(self, l_sents):
-        Comp_model.__init__(self, l_sents)
-        self.save_name = 'pair_wordnet_' + l_sents[0][0].corpus[:-2] + '_'
+    def __init__(self, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
+        self.save_name = 'pair_wordnet_' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_word
         self.sim = _relevance_wordnet
         self.model = None
@@ -211,10 +220,13 @@ def _relevance_wordnet(model, w_0, w_1):
 
 
 class Comp_we(Comp_model):
-    def __init__(self, model_name, l_sents):
-        Comp_model.__init__(self, l_sents)
+    def __init__(self, model_name, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
         self.typ = 'word'
-        self.save_name = 'pair_' + l_sents[0][0].corpus[:-2] + '_'
+        self.save_name = 'pair_' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_word
         self.sim = cosine_similarity
         self._update_model(model_name)
@@ -298,18 +310,24 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
 
 
 class Comp_we_wmd(Comp_we):
-    def __init__(self, model_name, l_sents):
-        Comp_model.__init__(self, l_sents)
-        self.save_name = 'pair_we_wmd' + l_sents[0][0].corpus[:-2] + '_'
+    def __init__(self, model_name, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
+        self.save_name = 'pair_we_wmd' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_concept
         self.sim = word_mover_distance
         self._update_model(model_name)
 
 
 class Comp_cluster(Comp_we):
-    def __init__(self, model_name, l_sents, k):
-        Comp_we.__init__(self, model_name, l_sents)
-        self.save_name = 'pair_cluster' + l_sents[0][0].corpus[:-2] + '_'
+    def __init__(self, model_name, l_sents, k, threshold=None):
+        if threshold is None:
+            Comp_we.__init__(self, model_name, l_sents)
+        else:
+            Comp_we.__init__(self, model_name, l_sents, threshold)
+        self.save_name = 'pair_cluster' + l_sents[0][0].corpus[:-2]
         self.sents = []
         for sentence in l_sents:
             self.sents.append(sentence.get_list_word())
@@ -317,17 +335,16 @@ class Comp_cluster(Comp_we):
 
     def prepare(self):
         Comp_model.prepare(self)
-        threshold = 0.2
-        if os.path.exists(self.save_name + str(threshold) + '.model'):
+        if os.path.exists(self.save_name  + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name +
-                                                str(threshold) + '.model')
+                                                '.model')
 
         else:
             from kmeans import kmeans
 
             self._clusters = kmeans(self.sents, self.k, 0.001, self.model)
             self._make_concept_pair()
-            with open(self.save_name + str(threshold) + '.model', 'w') as f:
+            with open(self.save_name + '.model', 'w') as f:
                 for tup in self.u_jk.keys():
                     j = tup[0]
                     k = tup[1]

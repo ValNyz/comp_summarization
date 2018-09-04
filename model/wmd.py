@@ -11,6 +11,13 @@ from scipy.spatial.distance import euclidean
 # import threading
 import pulp
 
+import logging
+logger = logging.getLogger(__name__)
+fh = logging.FileHandler(__name__ + ".log")
+fh.setLevel(logging.DEBUG)
+
+logger.addHandler(fh)
+
 
 # lock = threading.Lock()
 
@@ -24,7 +31,7 @@ def word_mover_distance(first_sent_tokens, second_sent_tokens, wvmodel,
 
 def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
     all_tokens = list(set().union(sent1, sent2))
-    # with lock:
+
     wordvecs = {token: wvmodel[token] for token in all_tokens}
 
     buckets1 = _tokens_to_fracdict(sent1)
@@ -35,7 +42,7 @@ def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
                               lowBound=0)
 
     prob = pulp.LpProblem('WMD', sense=pulp.LpMinimize)
-    # with lock:
+
     prob += pulp.lpSum([T[token1, token2]
                         * euclidean(wordvecs[token1], wordvecs[token2])
                         for token1, token2 in product(all_tokens,
@@ -50,7 +57,13 @@ def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
     if lpFile is not None:
         prob.writeLP(lpFile)
 
-    prob.solve()
+    try:
+        prob.solve()
+    except Exception:
+        logger.info('Problem infeasible')
+
+    logger.info("Status:", pulp.LpStatus[prob.status])
+
 
     return prob
 

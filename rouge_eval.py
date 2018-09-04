@@ -105,7 +105,7 @@ def execute_rouge(rouge_path, peer_path, model_path, output_path):
     write_settings_xml(peer_path, output_path, "Model", "Peer")
 
     print("Run cmd : " + os.path.join(".", rouge_path, "ROUGE-1.5.5.pl -e " +
-                                      rouge_path, "data -n 2 -x -m -c 95 -r" +
+                                      rouge_path, "data -n 3 -x -m -c 95 -r" +
                                       "1000 -f A -p 0.5 -t 0 -a " +
                                       output_path, "rouge_settings.xml"))
     sys.stdout, sys.stderr = bash.run_script(os.path.join(".", rouge_path, "ROUGE-1.5.5.pl -e " +

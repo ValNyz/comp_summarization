@@ -18,9 +18,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def score_sentence_knapsack(*l_sents):
-    # kp = comp_model.Comp_wordnet(l_sents)
-    kp = comp_model.Comp_we(WE_MODEL, l_sents)
+def score_sentence_knapsack(model, threshold, *l_sents):
+    # kp = comp_model.Comp_wordnet(l_sents, threshold)
+    kp = model #  comp_model.Comp_we(WE_MODEL, l_sents, threshold)
 
     kp.prepare()
     ocs_ikj = [[[kp.d_concept[c] for c in sen] for sen in kp.s_ik[doc]]
