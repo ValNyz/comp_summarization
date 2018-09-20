@@ -41,12 +41,14 @@ class Comp_model(object):
         self.pair_word = {}
         self.d_concept = {}
         self.d_sentence = {}
-        self.c_ij = []
-        self.s_ik = []
-        self.l_ik = []
-        self.w_ij = []
-        self.u_jk = {}  # weight for pair jk
-        self.s_jk = {}  # sim for pair jk
+        self.c_ij = []  # list[list[concept]] list of all concepts per doc
+        self.s_ik = []  # list of sentence as list of concept
+        self.l_ik = []  # list of sentence length
+        self.w_ij = []  # dict of concept weigth per doc
+        self.u_jk = {}  # comparative weight (average of weigth of concept 1j
+                        # and 2k) for pair jk
+        self.s_jk = {}  # similarity for pair jk
+        # self.nBOW = {}  # list of concept weigth = w_ij[0] + w_ij[1]
 
     def prepare(self):
         self._make_concept()
@@ -98,6 +100,7 @@ class Comp_model(object):
                 self.c_ij[i].extend(temp)
             self.w_ij.append(Counter(self.c_ij[i]))
             self.c_ij[i] = list(set(self.c_ij[i]))
+        # self.nBOW = self.w_ij[0] + self.w_ij[1]
         for j, c_0 in enumerate(self.c_ij[0]):
             self.d_concept[c_0] = (j, None)
         for j, c_1 in enumerate(self.c_ij[1]):
@@ -316,6 +319,18 @@ class Comp_we_wmd(Comp_we):
         else:
             Comp_model.__init__(self, l_sents, threshold)
         self.save_name = 'pair_we_wmd' + l_sents[0][0].corpus[:-2]
+        self.eval = _evaluate_pair_concept
+        self.sim = word_mover_distance
+        self._update_model(model_name)
+
+
+class Comp_we_fast_wmd(Comp_we):
+    def __init__(self, model_name, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
+        self.save_name = 'pair_we_fast_wmd' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_concept
         self.sim = word_mover_distance
         self._update_model(model_name)

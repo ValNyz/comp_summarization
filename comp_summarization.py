@@ -92,7 +92,7 @@ def parse_options():
     parser.add_option('-m', '--model',  dest='model', type='str',
                       help='model type (WordNet, WE, WE_WMD, Cluster)')
     parser.add_option('-c', '--comparative',  dest='comparative', type='str',
-                      help='comparative method (ILP, Knapsack)')
+                      help='comparative method (ilp, knapsack)')
     parser.add_option('-l', '--length', dest='length', type='int',
                       help='maximum number of words in summaries', default=100)
     parser.add_option('-i', '--input-path', dest='inputpath', type='str',

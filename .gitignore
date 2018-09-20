@@ -15,12 +15,12 @@ treetagger
 *.model
 *.result
 testWiki
-*.pyc
+*.py[cod]
 
 ###############################
 #	FOLDER
 ###############################
-data/*
-output/*
-__pycache__/*
-summary/*
+data/
+output/
+__pycache__/
+summary/

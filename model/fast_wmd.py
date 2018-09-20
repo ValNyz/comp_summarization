@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Word Mover's Distance using word embeddings
+Fast Word Mover's Distance using word embeddings
     From Word Embeddings To Document Distances (Kusner et al, 2015)
 __author__ : Valentin Nyzam
 """
@@ -22,8 +22,10 @@ logger.addHandler(fh)
 # lock = threading.Lock()
 
 
-def word_mover_distance(wvmodel, first_sent_tokens, second_sent_tokens,
+def fast_word_mover_distance(model, first_sent_tokens, second_sent_tokens,
                         lpFile=None):
+    wvmodel = model[0]
+    nBOW = model[1]
     prob = _word_mover_distance_probspec(first_sent_tokens, second_sent_tokens,
                                          wvmodel, lpFile=lpFile)
     # print(pulp.value(prob.objective))
