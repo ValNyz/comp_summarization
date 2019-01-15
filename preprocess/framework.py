@@ -87,8 +87,8 @@ class SummaryProblem:
                        encoding=encoding)
         lemm_fh = open(os.path.join(path, self.id + "-A" + lemm_file), 'w',
                        encoding=encoding)
-        lemm_pos_fh = open(os.path.join(path, self.id + "-A" + lemm_pos_file), 'w',
-                       encoding=encoding)
+        # lemm_pos_fh = open(os.path.join(path, self.id + "-A" + lemm_pos_file), 'w',
+                       # encoding=encoding)
         doc_fh = open(os.path.join(path, self.id + "-A" + doc_file), 'w',
                        encoding=encoding)
         par_fh = open(os.path.join(path, self.id + "-A" + par_file), 'w',
@@ -103,13 +103,13 @@ class SummaryProblem:
                 sent_fh.write('%s\n' % sent.original)  # % cleaned)
                 tok_fh.write('%s\n' % ' '.join(sent.tokens))
                 lemm_fh.write('%s\n' % ' '.join(sent.lemm))
-                lemm_pos_fh.write('%s\n' % ' '.join(sent.lemm_pos))
+                # lemm_pos_fh.write('%s\n' % ' '.join(sent.lemm_pos))
                 doc_fh.write('%s\n' % (doc.id))
                 par_fh.write('%d\n' % int(sent.paragraph_starter))
         sent_fh.close()
         tok_fh.close()
         lemm_fh.close()
-        lemm_pos_fh.close()
+        # lemm_pos_fh.close()
         doc_fh.close()
         par_fh.close()
         sent_fh = open(os.path.join(path, self.id + "-B" + sent_file), 'w',
@@ -118,8 +118,8 @@ class SummaryProblem:
                        encoding=encoding)
         lemm_fh = open(os.path.join(path, self.id + "-B" + lemm_file), 'w',
                        encoding=encoding)
-        lemm_pos_fh = open(os.path.join(path, self.id + "-B" + lemm_pos_file), 'w',
-                       encoding=encoding)
+        # lemm_pos_fh = open(os.path.join(path, self.id + "-B" + lemm_pos_file), 'w',
+                       # encoding=encoding)
         doc_fh = open(os.path.join(path, self.id + "-B" + doc_file), 'w',
                        encoding=encoding)
         par_fh = open(os.path.join(path, self.id + "-B" + par_file), 'w',
@@ -134,13 +134,13 @@ class SummaryProblem:
                 sent_fh.write('%s\n' % sent.original)  # % cleaned)
                 tok_fh.write('%s\n' % ' '.join(sent.tokens))
                 lemm_fh.write('%s\n' % ' '.join(sent.lemm))
-                lemm_pos_fh.write('%s\n' % ' '.join(sent.lemm_pos))
+                # lemm_pos_fh.write('%s\n' % ' '.join(sent.lemm_pos))
                 doc_fh.write('%s\n' % (doc.id))
                 par_fh.write('%d\n' % int(sent.paragraph_starter))
         sent_fh.close()
         tok_fh.close()
         lemm_fh.close()
-        lemm_pos_fh.close()
+        # lemm_pos_fh.close()
         doc_fh.close()
         par_fh.close()
 
@@ -169,10 +169,12 @@ def setup_task(task):
 
     # get all document data
     all_docs = {}
+    # print(task.doc_path)
     logger.debug(task.doc_path)
     files = util.get_files(task.doc_path,
                                     r'[^_]+_?[^_]*_?\d+[\.\-]\d+')
     logger.debug(files)
+    # print(files)
     sys.stderr.write('Loading [%d] files\n' % len(files))
     for file in files:
         logger.debug(file)
@@ -207,6 +209,8 @@ def setup_task(task):
             return
         # import pdb
         # pdb.set_trace()
+        # print(all_docs)
+        # print(doc_sets)
         for docset_index in range(0, len(docsets) - 1, 2):
 
             # map docids to documents

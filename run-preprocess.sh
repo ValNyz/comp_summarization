@@ -1,7 +1,7 @@
 #!/bin/bash
 #DOCS=/home/nyzam/data/TAC2008/UpdateSumm08_test_docs_files
-DOCS=/home/valnyz/data/comparative/eval_doc
-REF=/home/valnyz/data/comparative/model_sum
+DOCS="C:/cygwin64/home/Val/data/comparative/eval_doc"
+REF="C:/cygwin64/home/Val/data/comparative/model_sum"
 TASK=$1
 OUTPUT="output/$TASK/"
 #export PYTHONPATH=splitta:$PYTHONPATH
@@ -10,7 +10,7 @@ OUTPUT="output/$TASK/"
 #export PATH=solver/glpk-4.43/examples/:$PATH
 mkdir -p $OUTPUT
 
-python3 preprocess.py -i $DOCS -o $OUTPUT --task $TASK --reload
+python preprocess.py -i $DOCS -o $OUTPUT --task $TASK --reload
 
 #for i in $OUTPUT/*.sent ; do preprocess/penn_treebank_tokenizer.sed $i > $i.tok;done
 
