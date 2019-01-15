@@ -128,10 +128,9 @@ def build_dicts(*l_sents):
     :return: dict_int: dict of (int:str)
     :return: dict_str: dict of (str:int)
     """
-    sents = chain(*l_sents)
     dict_str = {}
     dict_int = {}
-    for sen in sents:
+    for sen in chain(*l_sents):
         for word in sen:
             if word not in dict_str:
                 dict_int[len(dict_int)] = word

@@ -21,6 +21,7 @@ from collections import Counter
 from nltk.util import ngrams
 from nltk.corpus import wordnet as wn
 from scipy.spatial.distance import cosine
+from scipy.spatial.distance import euclidean
 from model.wmd import word_mover_distance
 from globals import THREAD
 
@@ -232,8 +233,9 @@ class Comp_we(Comp_model):
         self.save_name = 'pair_' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_word
         self.sim = cosine_similarity
-        self._update_model(model_name)
 
+        if not os.path.exists(self.save_name + '.model'):
+            self._update_model(model_name)
     def _update_model(self, model_name):
         """_update_model
         update word embeddings model on self.l_sents for unseen word
@@ -311,6 +313,30 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
             sleep(0.001)
             pass
 
+class Comp_we_min_cosinus(Comp_we):
+    def __init__(self, model_name, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
+        self.save_name = 'pair_we_min_cosinus_' + l_sents[0][0].corpus[:-2]
+        self.eval = _evaluate_pair_concept
+        self.sim = min_cosine_similarity
+        # self.sim = word_mover_distance
+        self._update_model(model_name)
+
+class Comp_we_min_euclidean(Comp_we):
+    def __init__(self, model_name, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
+        self.save_name = 'pair_we_min_euclidean_' + l_sents[0][0].corpus[:-2]
+        self.eval = _evaluate_pair_concept
+        self.sim = min_euclidean_similarity
+        # self.sim = word_mover_distance
+        self._update_model(model_name)
+
 
 class Comp_we_wmd(Comp_we):
     def __init__(self, model_name, l_sents, threshold=None):
@@ -318,19 +344,7 @@ class Comp_we_wmd(Comp_we):
             Comp_model.__init__(self, l_sents)
         else:
             Comp_model.__init__(self, l_sents, threshold)
-        self.save_name = 'pair_we_wmd' + l_sents[0][0].corpus[:-2]
-        self.eval = _evaluate_pair_concept
-        self.sim = word_mover_distance
-        self._update_model(model_name)
-
-
-class Comp_we_fast_wmd(Comp_we):
-    def __init__(self, model_name, l_sents, threshold=None):
-        if threshold is None:
-            Comp_model.__init__(self, l_sents)
-        else:
-            Comp_model.__init__(self, l_sents, threshold)
-        self.save_name = 'pair_we_fast_wmd' + l_sents[0][0].corpus[:-2]
+        self.save_name = 'pair_we_wmd_' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_concept
         self.sim = word_mover_distance
         self._update_model(model_name)
@@ -342,7 +356,7 @@ class Comp_cluster(Comp_we):
             Comp_we.__init__(self, model_name, l_sents)
         else:
             Comp_we.__init__(self, model_name, l_sents, threshold)
-        self.save_name = 'pair_cluster' + l_sents[0][0].corpus[:-2]
+        self.save_name = 'pair_cluster_' + l_sents[0][0].corpus[:-2]
         self.sents = []
         for sentence in l_sents:
             self.sents.append(sentence.get_list_word())
@@ -425,6 +439,20 @@ def l_sent_to_str(l_sents):
 def cosine_similarity(model, w1, w2):
     return 1-cosine(model[w1], model[w2])
 
+def min_cosine_similarity(model, c1, c2):
+    value = []
+    for w1 in c1:
+        for w2 in c2:
+            value.append(1-cosine(model[w1], model[w2]))
+    return min(value)
+
+def min_euclidean_similarity(model, c1, c2):
+    value = []
+    for w1 in c1:
+        for w2 in c2:
+            value.append(1/(1+euclidean(model[w1], model[w2])))
+    return min(value)
+
 
 def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
     """
@@ -443,7 +471,7 @@ def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
             if order > 1:
                 set_doc_concept.update(ngrams(sent, order))
             for w in sent:
-                set_doc_concept.add((w,))
+                set_doc_concept.add(w)
         for concept in set_doc_concept:
             if concept in dict_idf:
                 dict_idf[concept] += 1.
@@ -458,14 +486,17 @@ def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
 def reuters_idf_dict(current_docs, file_name, order=2):
     """
     """
-    idf_file = file_name + ".idf"
+    idf_file = file_name + '_' + str(order) + ".idf"
     dict_idf = {}
     if os.path.exists(idf_file):
         with open(idf_file, 'r', encoding='utf-8') as f:
             for line in f:
                 values = line.split("\t")
                 # print(values)
-                dict_idf[tuple(values[0].split())] = float(values[1])
+                if order > 1:
+                    dict_idf[tuple(values[0].split())] = float(values[1])
+                else:
+                    dict_idf[values[0]] = float(values[1])
         dict_idf = make_concept_idf_dict(current_docs, dict_idf,
                                          len(reuters.fileids()))
         return dict_idf
@@ -477,8 +508,11 @@ def reuters_idf_dict(current_docs, file_name, order=2):
         dict_idf = make_concept_idf_dict(l_docs, order=order)
         with open(idf_file, 'w', encoding='utf-8') as f:
             for concept in dict_idf.keys():
-                f.write(' '.join(concept) + '\t' + str(dict_idf[concept]) +
+                if order > 1:
+                    f.write(' '.join(concept) + '\t' + str(dict_idf[concept]) +
                         '\n')
+                else:
+                    f.write(concept + '\t' + str(dict_idf[concept]) + '\n')
         dict_idf = make_concept_idf_dict(current_docs, dict_idf,
                                          len(reuters.fileids()))
         return dict_idf

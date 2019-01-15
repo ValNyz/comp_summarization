@@ -10,8 +10,10 @@ import time
 import os
 import browse_corpus
 from model import comp_model
+from model import comp_sent_model
 from globals import WE_MODEL
 from knapsack import score_sentence_knapsack
+from knapsack2 import score_sentence_knapsack2
 from ilp import score_sentence_ilp
 from minimum_dominating_set import score_sentences_MDS
 # from cross_entropy_summary import score_sentences_cross_entropy
@@ -30,7 +32,7 @@ def score_sentence_by_word(sent, dict):
 
 
 def make_comp_summary(comparative, model, threshold,
-                      data_path, corpus_id, summ_path, length, options):
+                      data_path, corpus_id, summ_path, length):
     # load sents
     s_A, sents_A = browse_corpus.load_sents(data_path, corpus_id + '-A')
     s_B, sents_B = browse_corpus.load_sents(data_path, corpus_id + '-B')
@@ -45,11 +47,20 @@ def make_comp_summary(comparative, model, threshold,
         c_model = comp_model.Comp_we(WE_MODEL, l_sents, threshold)
     elif model == 'WE_WMD':
         c_model = comp_model.Comp_we_wmd(WE_MODEL, l_sents, threshold)
-    
+    elif model == 'WE_COS':
+        c_model = comp_model.Comp_we_min_cosinus(WE_MODEL, l_sents, threshold)
+    elif model == 'WE_EUC':
+        c_model = comp_model.Comp_we_min_euclidean(WE_MODEL, l_sents, threshold)
+    elif model == 'WE_SENT_WMD':
+        c_model = comp_sent_model.Comp_sent_model(WE_MODEL, l_sents, threshold)
+
+
     if comparative == 'knapsack':
         summary_A, summary_B = score_sentence_knapsack(c_model, threshold, sents_A, sents_B)
     elif comparative == 'ilp':
         summary_A, summary_B = score_sentence_ilp(c_model, threshold, sents_A, sents_B)
+    elif comparative == 'knapsack2':
+        summary_A, summary_B = score_sentence_knapsack2(c_model, threshold, sents_A, sents_B)
 
     # summary_A, summary_B = score_sentences_MDS(sents_A, sents_B)
     # dict_sent_A, dict_sent_B = score_sentences_k_core(sents_A, sents_B, \
@@ -126,7 +137,7 @@ if __name__ == '__main__':
                                                  options.threshold,
                                                  os.path.join(path, c_id), c_id,
                                                  os.path.join(path, 'summary'),
-                                                 options.length, options)
+                                                 options.length)
 
         os.makedirs(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold)), exist_ok=True)
