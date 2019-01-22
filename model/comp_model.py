@@ -504,7 +504,10 @@ class Comp_sentence_model(Comp_we):
                 k = tup[0][1]
 
                 self.u_jk[(j, k)] = tup[1]
-                self.s_jk[(j, k)] = tup[2]
+                if self.u_jk[(j, k)] is None:
+                    self.s_jk[(j, k)] = [tup[2]]
+                else:
+                    self.s_jk[(j, k)].append(tup[2])
 
                 counter_dq += 1
                 # if counter_dq % 1000 == 0:
@@ -519,6 +522,9 @@ class Comp_sentence_model(Comp_we):
         # stop workers
         for t in threads:
             t.terminate()
+
+        for key in s_ij.keys():
+            s_ij[key] = sum(s_ij[key])/len(s_ij[key])
 
         # done_q.join()
 

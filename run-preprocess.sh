@@ -1,7 +1,7 @@
 #!/bin/bash
 #DOCS=/home/nyzam/data/TAC2008/UpdateSumm08_test_docs_files
-DOCS="C:/cygwin64/home/Val/data/comparative/eval_doc"
-REF="C:/cygwin64/home/Val/data/comparative/model_sum"
+DOCS="/home/valnyz/PhD/data/comparative/eval_doc"
+REF="/home/valnyz/PhD/data/comparative/model_sum"
 TASK=$1
 OUTPUT="output/$TASK/"
 #export PYTHONPATH=splitta:$PYTHONPATH

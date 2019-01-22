@@ -145,7 +145,7 @@ class Sentence:
                        text_processor.tokenize(self.original.lower())]
         self.pos = nltk.pos_tag(self.tokens)
         self.stemmed = [text_processor.porter_stem(tok) for tok in self.tokens]
-        self.lemm = [lemm for lemm in text_processor.lemm_sent(self.pos)]
+        self.lemm = text_processor.lemm_sent(self.pos)
         self.no_stop = [text_processor.porter_stem(tok) for tok in
                         text_processor.remove_stopwords(self.tokens)]
 
