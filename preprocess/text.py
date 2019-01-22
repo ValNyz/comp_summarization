@@ -18,9 +18,11 @@ import string
 
 from nltk import SnowballStemmer
 from nltk.tokenize.toktok import ToktokTokenizer
+from nltk.stem import WordNetLemmatizer
+from nltk.corpus import wordnet
 # from nltk.tokenize.moses import MosesTokenizer
 # from nltk.corpus import stopwords
-from treetagger.treetagger import TreeTagger
+# from treetagger.treetagger import TreeTagger
 
 import preprocess.util as util
 from globals import STOPWORDS
@@ -32,7 +34,7 @@ class TextProcessor:
         self._tok = ToktokTokenizer()
         # self._tok = MosesTokenizer(lang='en')
         self._stemmer = SnowballStemmer('english')
-        self._lemmatizer = TreeTagger(language='english')
+        self._lemmatizer = WordNetLemmatizer() # TreeTagger(language='english')
         self._stopwords = set(open(STOPWORDS).read().splitlines())
         # istopwords.words('french') #
         self._porter_stemmer = nltk.stem.porter.PorterStemmer()
@@ -57,12 +59,12 @@ class TextProcessor:
 
     def remove_pos_stopwords(self, words, pos):
         list_lemm = []
-        list_pos = []
+        # list_pos = []
         for w, p in zip(words, pos):
             if w not in self._stopwords:
                 list_lemm.append(w)
-                list_pos.append(p)
-        return list_lemm, list_pos
+                # list_pos.append(p)
+        return list_lemm #, list_pos
 
     def is_just_stopwords(self, words):
         if type(words) == type(''):
@@ -94,21 +96,15 @@ class TextProcessor:
             if letter not in set(string.punctuation):
                 return False
 
-    def lemm_sent(self, sent):
+    def lemm_sent(self, sen_pos):
         if self._lemmatizer is None:
             return sent
         else:
             lemm_sent = []
-            lemm_pos = []
-            for tup in self._lemmatizer.tag(sent):
-                if tup[2] != "<unknown>":
-                    if "PUN" not in tup[1] and tup[1] != "SENT":
-                        lemm_sent.append(tup[2].split('|')[0])
-                        lemm_pos.append(tup[1])
-                else:
-                    lemm_sent.append(tup[0])
-                    lemm_pos.append('u')
-            return lemm_sent, lemm_pos
+            for tup in sen_pos:
+                lemm_sent.append(self._lemmatizer.lemmatize(tup[0], get_wordnet_pos(tup[1])))
+            return lemm_sent
+            # return lemm_sent , lemm_pos
 
     def stem_sent(self, sent):
         return [self.stem(word) for word in sent]
@@ -147,8 +143,9 @@ class Sentence:
         self.length = len(self.original.split())
         self.tokens = [tok.strip() for tok in
                        text_processor.tokenize(self.original.lower())]
+        self.pos = nltk.pos_tag(self.tokens)
         self.stemmed = [text_processor.porter_stem(tok) for tok in self.tokens]
-        self.lemm, self.lemm_pos = text_processor.lemm_sent(self.original)
+        self.lemm = [lemm for lemm in text_processor.lemm_sent(self.pos)]
         self.no_stop = [text_processor.porter_stem(tok) for tok in
                         text_processor.remove_stopwords(self.tokens)]
 
@@ -362,3 +359,16 @@ class Document:
         s.append('TEXT')
         s.extend(self.paragraphs)
         return '\n'.join(s)
+
+
+def get_wordnet_pos(tag):
+    if tag.startswith('J'):
+        return wordnet.ADJ
+    elif tag.startswith('V'):
+        return wordnet.VERB
+    elif tag.startswith('N'):
+        return wordnet.NOUN
+    elif tag.startswith('R'):
+        return wordnet.ADV
+    else:
+        return wordnet.NOUN

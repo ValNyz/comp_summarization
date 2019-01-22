@@ -115,7 +115,6 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     for s in range(len(l_ik[1])):
         l_sen.append((1, s))
     shuffle(l_sen)
- 
     s_0 = 0
     s_1 = 0
 
@@ -228,7 +227,7 @@ def bi_objective(lambd, c_ij, ocs_ikj, w_ij, u_jk, sum_0, sum_1):
     comp = 0.
     rep = 0.
 
-    lc_0 = set() 
+    lc_0 = set()
     lc_1 = set()
 
     for sen in sum_0:

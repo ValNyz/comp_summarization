@@ -13,24 +13,22 @@ from preprocess.text import text_processor as tp
 
 
 class Sentence:
-    def __init__(self, corpus, id, order, orig, doc, tok=None, pos=None,
+    def __init__(self, corpus, id, order, orig, doc, tok=None, lemm=None,
                  parse=None, par=None, unresolved=False):
         self.corpus = corpus
         self.id = id
         self.order = order
         self.orig = orig
-        self.len = len(tok.split())
-        self.tok = [word for word in tp.remove_punct(tok).split()
-                    if len(word) > 0]
-        self.pos = pos.split()
-        if pos is not None:
-            self.tok2, self.lemm_pos = \
-                   tp.remove_pos_stopwords(self.tok,
-                                           [p for p in
-                                            tp.remove_punct(pos).split()
-                                            if len(p) > 0])
-        else:
+        if tok is not None:
+            self.tok = [word for word in tp.remove_punct(tok).split()
+                        if len(word) > 0]
             self.tok2 = tp.remove_stopwords(self.tok)
+        self.len = len(tok)
+        if lemm is not None:
+            # self.pos = pos.split()
+            self.lemm = [word for word in tp.remove_punct(lemm).split()
+                        if len(word) > 0]
+            self.lemm2 = tp.remove_stopwords(self.lemm)
         # self.stem = tp.stem_sent(self.tok2)
         # self.lemm = tp.remove_stopwords([word.lower()
         # for word in tp.lemm_sent(self.orig) if len(word) > 0])
@@ -51,10 +49,10 @@ class Sentence:
         return self.len
 
     def __iter__(self):
-        return iter(self.tok2)
+        return iter(self.tok)
 
     def get_list_word(self):
-        return self.tok2
+        return self.tok
 
     def get_list_word_pos(self):
         return [(w, p) for p in self.lemm_pos for w in self.tok2]
@@ -78,8 +76,8 @@ def load_sents(input_path, corpus_id, encoding='utf-8'):
     data_path = os.path.join(input_path, corpus_id)
     orig_fh = open(data_path + '.sent', encoding=encoding)
     # tok_fh = open(data_path + '.sent.tok')
-    tok_fh = open(data_path + '.sent.tok.lemm', encoding=encoding)
-    pos_fh = open(data_path + '.sent.tok.lemm.pos', encoding=encoding)
+    tok_fh = open(data_path + '.sent.tok', encoding=encoding)
+    lemm_fh = open(data_path + '.sent.tok.lemm', encoding=encoding)
     doc_fh = open(data_path + '.doc', encoding=encoding)
     par_fh = open(data_path + '.par', encoding=encoding)
     parse_fh = None
@@ -92,25 +90,26 @@ def load_sents(input_path, corpus_id, encoding='utf-8'):
     prev_doc = ''
     while True:
         if parse_fh:
-            [corpus, doc, orig, tok, pos, parse, par] = \
-                    [str.strip() for str in [corpus_id, doc_fh.readline(),
-                                             orig_fh.readline(),
-                                             tok_fh.readline(),
-                                             pos_fh.readline(),
-                                             parse_fh.readline(),
-                                             par_fh.readline()]]
+            [corpus, doc, orig, tok, lemm, parse, par] = \
+                    [s.strip() for s in [corpus_id, doc_fh.readline(),
+                                         orig_fh.readline(),
+                                         tok_fh.readline(),
+                                         lemm_fh.readline(),
+                                         parse_fh.readline(),
+                                         par_fh.readline()]]
         else:
-            [corpus, doc, orig, tok, pos, parse, par] = \
-                    [str.strip() for str in [corpus_id, doc_fh.readline(),
-                                             orig_fh.readline(),
-                                             tok_fh.readline(),
-                                             pos_fh.readline(), "",
-                                             par_fh.readline()]]
-        if not (doc or orig or tok or pos or parse):
+            [corpus, doc, orig, tok, lemm, parse, par] = \
+                    [s.strip() for s in [corpus_id, doc_fh.readline(),
+                                         orig_fh.readline(),
+                                         tok_fh.readline(),
+                                         lemm_fh.readline(),
+                                         "",
+                                         par_fh.readline()]]
+        if not (doc or orig or tok or lemm or parse):
             break
         if doc != prev_doc:
             order = 0
-        s = Sentence(corpus, count, order, orig, doc, tok, pos, parse, par)
+        s = Sentence(corpus, count, order, orig, doc, tok, lemm, parse, par)
         if len(s.tok2) > 0:
             sents.append(s)
             order += 1

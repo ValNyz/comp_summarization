@@ -33,6 +33,7 @@ def score_sentence_by_word(sent, dict):
 
 def make_comp_summary(comparative, model, threshold,
                       data_path, corpus_id, summ_path, length):
+
     # load sents
     s_A, sents_A = browse_corpus.load_sents(data_path, corpus_id + '-A')
     s_B, sents_B = browse_corpus.load_sents(data_path, corpus_id + '-B')
@@ -53,7 +54,10 @@ def make_comp_summary(comparative, model, threshold,
         c_model = comp_model.Comp_we_min_euclidean(WE_MODEL, l_sents, threshold)
     elif model == 'WE_SENT_WMD':
         c_model = comp_sent_model.Comp_sent_model(WE_MODEL, l_sents, threshold)
+    elif model == 'WE_SEN':
+        c_model = comp_model.Comp_sentence_model(WE_MODEL, l_sents, threshold)
 
+    c_model.prepare()
 
     if comparative == 'knapsack':
         summary_A, summary_B = score_sentence_knapsack(c_model, threshold, sents_A, sents_B)
@@ -125,7 +129,8 @@ if __name__ == '__main__':
     start = time.process_time()
 
     # os.popen('mkdir -p %s' % os.path.join(options.outpath, 'summary'))
-    os.popen('mkdir -p %s' % os.path.join(path, 'summary'))
+    os.makedirs(os.path.join(path, 'summary'), exist_ok=True)
+    # os.popen('mkdir -p %s' % os.path.join(path, 'summary'))
     # run through all corpus
     for c_id in os.listdir(path):
         if 'summary' in c_id or 'rouge_settings.xml' in c_id or 'Model' in c_id or 'Peer' in c_id:

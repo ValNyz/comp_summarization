@@ -53,9 +53,9 @@ class Comp_model(object):
 
     def prepare(self):
         self._make_concept()
-        print("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
-        print("Nb concept in doc 0 : " + str(len(self.c_ij[0])))
-        print("Nb concept in doc 1 : " + str(len(self.c_ij[1])))
+        logger.info("Vocab size : " + str(len(self.c_ij[0]) + len(self.c_ij[1])))
+        logger.info("Nb concept in doc 0 : " + str(len(self.c_ij[0])))
+        logger.info("Nb concept in doc 1 : " + str(len(self.c_ij[1])))
 
         if os.path.exists(self.save_name + '.model'):
             self.u_jk = self._read_concept_pair(self.save_name + '.model')
@@ -84,7 +84,7 @@ class Comp_model(object):
             self.c_ij.append([])
             self.s_ik.append([])
             self.l_ik.append([])
-            for sentence in doc:
+            for j, sentence in enumerate(doc):
                 if self.typ == 'pos':
                     sent = sentence.get_list_word_pos()
                 else:
@@ -95,7 +95,7 @@ class Comp_model(object):
                 for w in sent:
                     temp.append((w,))
                 # temp.extend(sent)
-                self.d_sentence[id(sent)] = (i, len(self.s_ik))
+                self.d_sentence[(i, j)] = len(self.s_ik[i])
                 self.s_ik[i].append(temp)
                 self.l_ik[i].append(len(sentence))
                 self.c_ij[i].extend(temp)
@@ -168,7 +168,7 @@ class Comp_model(object):
         q.join()
 
         counter_dq = 0
-        while counter_dq < size: 
+        while counter_dq < size:
         # while not q.empty() or not done_q.empty():
             try:
                 tup = done_q.get()
@@ -243,11 +243,19 @@ class Comp_we(Comp_model):
         sents = []
         for ss in self.l_sents:
             sents.extend(ss)
-        self.model = gensim.models.Word2Vec.load(model_name)
-        self.model.min_count = 0
-        self.model.build_vocab(sents, update=True)
-        self.model.train(sents, total_examples=len(sents),
-                         epochs=self.model.epochs)
+        if os.path.exists(model_name):
+            self.model = gensim.models.Word2Vec.load(model_name)
+            self.model.min_count = 0
+            self.model.build_vocab(sents, update=True)
+            self.model.train(sents, total_examples=len(sents),
+                             epochs=self.model.epochs)
+        else:
+            self.model = gensim.models.Word2Vec(sents,
+                                   size=300,
+                                   window=10,
+                                   min_count=0,
+                                   workers=THREAD)
+            self.model.train(sents, total_examples=len(sents), epochs=10)
 
 
 def _print_progress(q, done_q):
@@ -430,6 +438,118 @@ class Comp_cluster(Comp_we):
             t.terminate()
 
         print('Nb pair : ' + str(len(self.u_jk)))
+
+
+class Comp_sentence_model(Comp_we):
+    def __init__(self, model_name, l_sents, threshold=None):
+        if threshold is None:
+            Comp_model.__init__(self, l_sents)
+        else:
+            Comp_model.__init__(self, l_sents, threshold)
+
+        self.save_name = 'pair_sentence_' + l_sents[0][0].corpus[:-2]
+        self.eval = _evaluate_pair_concept
+        self.sim = word_mover_distance
+        self.model = None
+        self._update_model(model_name)
+
+    def _make_concept_pair(self):
+        """make_concept_pair
+        :param c_ij:
+        :param w_ij:
+        :param similarity: similarity function: input(sentence, sentence):
+            ouput(0<int<1)
+        :return list[np.array]: size [j, k]
+        """
+        q = JoinableQueue()
+        done_q = Queue()
+
+        threads = []
+        for i in range(THREAD):
+            t = Process(target=_evaluate_pair_sentence,
+                        args=(self.model, self.d_concept, self.s_ik, self.w_ij, q, done_q,
+                              self.threshold))
+            t.start()
+            threads.append(t)
+
+        t = Process(target=_print_progress, args=(q, done_q))
+        t.start()
+        threads.append(t)
+
+        size_sen = len(self.l_sents[0]) * len(self.l_sents[1])
+        size = len(self.c_ij[0]) * len(self.c_ij[1])
+        logger.info(str(size_sen) + ' sentence pairs to test')
+        # for j in range(len(self.l_sents[0])):
+            # s_0 = self.l_sents[0][j]
+        for j, s_0 in enumerate(self.l_sents[0]):
+            # for k in range(len(self.l_sents[1])):
+                # s_1 = self.l_sents[1][k]
+            for k, s_1 in enumerate(self.l_sents[1]):
+                tup = (
+                    (j, s_0),
+                    (k, s_1)
+                )
+                q.put(tup)
+        logger.info('Queuing complete')
+
+        # block until all pair are processed.
+        # q.join()
+
+        counter_dq = 0
+        while not q.empty() or not done_q.empty():
+        # while not q.empty() or not done_q.empty():
+            try:
+                tup = done_q.get()
+                j = tup[0][0]
+                k = tup[0][1]
+
+                self.u_jk[(j, k)] = tup[1]
+                self.s_jk[(j, k)] = tup[2]
+
+                counter_dq += 1
+                # if counter_dq % 1000 == 0:
+                    # logger.info(str(counter_dq) + " pair already processed.")
+                # done_q.task_done()
+            except queue.Empty:
+                logger.info("Done_q is empty")
+                sleep(0.1)
+                pass
+        logger.info("Processing complete")
+
+        # stop workers
+        for t in threads:
+            t.terminate()
+
+        # done_q.join()
+
+        logger.info('Verify nb pair : ')
+        logger.info('Nb pair : ' + str(counter_dq))
+        logger.info('Nb pair : ' + str(len(self.u_jk)))
+
+
+def _evaluate_pair_sentence(model, d_concept, s_ik, w_ij, q, done_q, threshold):
+    """
+    item = ((j, s_0), (k, s_1))
+    """
+    while True:
+        try:
+            item = q.get()
+            s_0 = item[0][1]
+            s_1 = item[1][1]
+            j = item[0][0]
+            k = item[1][0]
+
+            sim = word_mover_distance(model, s_0.tok, s_1.tok)
+            if sim > threshold:
+                for c_0 in s_ik[0][j]:
+                    j_c = d_concept[c_0]
+                    for c_1 in s_ik[1][k]:
+                        k_c = d_concept[c_1]
+                        done_q.put(((j_c, k_c), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
+            q.task_done()
+        except queue.Empty:
+            sleep(0.001)
+            pass
 
 
 def l_sent_to_str(l_sents):
