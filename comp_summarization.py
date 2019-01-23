@@ -11,6 +11,8 @@ import os
 import browse_corpus
 from model import comp_model
 from model import comp_sent_model
+from globals import THREAD
+from globals import LOG_LEVEL
 from globals import WE_MODEL
 from knapsack import score_sentence_knapsack
 from knapsack2 import score_sentence_knapsack2
@@ -120,7 +122,45 @@ def parse_options():
                       help='character encoding of text input')
     return parser.parse_args()
 
+
+def __init__():
+    import logging
+    from logging import StreamHandler
+    from logging.handlers import TimedRotatingFileHandler
+
+    # Create the Logger
+    logger = logging.getLogger()
+    logger.setLevel(LOG_LEVEL)
+
+    if len(logger.handlers) > 0:
+        logger.handlers.clear()
+
+    # Create the Handler for logging data to a file
+    logger_handler = TimedRotatingFileHandler('logs/comp_summarization.log',
+                                              when='D', interval=1,
+                                              backupCount=7)
+    logger_handler.setLevel(logging.DEBUG)
+
+    # Create the Handler for logging data to console.
+    console_handler = StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+
+    # Create a Formatter for formatting the log messages
+    logger_formatter = logging.Formatter('%(name)s - %(threadName)s - %(levelname)s - %(message)s')
+
+    # Add the Formatter to the Handler
+    logger_handler.setFormatter(logger_formatter)
+    console_handler.setFormatter(logger_formatter)
+
+    # Add the Handler to the Logger
+    logger.addHandler(logger_handler)
+    logger.addHandler(console_handler)
+
+    return logger
+
 if __name__ == '__main__':
+    logger = __init__()
+    logger.info('Nb thread : ' + str(THREAD))
     options, task = parse_options()
     task = options.task
 
@@ -136,7 +176,7 @@ if __name__ == '__main__':
         if 'summary' in c_id or 'rouge_settings.xml' in c_id or 'Model' in c_id or 'Peer' in c_id:
             continue
         # new output
-        print(c_id)
+        logger.info(c_id)
 
         summary_A, summary_B = make_comp_summary(options.comparative, options.model,
                                                  options.threshold,
@@ -149,14 +189,17 @@ if __name__ == '__main__':
 
         with open(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold), c_id + "-A.sum"), 'w') as f:
+            summ = '' 
             for sent in summary_A:
                 f.write(str(sent) + '\n')
-                print(sent)
-        print()
+                summ += str(sent) + '\n'
+            logger.info(summ)
         with open(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold), c_id + "-B.sum"), 'w') as f:
+            summ = '' 
             for sent in summary_B:
                 f.write(str(sent) + '\n')
-                print(sent)
+                summ += str(sent) + '\n'
+            logger.info(summ)
     end = time.process_time()
-    print('Global execution time : ' + str(end-start))
+    logger.info('Global execution time : ' + str(end-start))

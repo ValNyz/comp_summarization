@@ -248,7 +248,6 @@ class Document:
             # sents_text_glued = glue_quotes(sents_text)
             par_sent_count = 0
             for sent_text in sents_text:
-                # print order, sent_text
                 if order == 0 and re.search('By [A-Z]', sent_text):
                     continue
                 if order == 0 and sent_text.startswith('('):
@@ -280,8 +279,8 @@ class Document:
                 self.sentences.append(sentence)
                 order += 1
                 par_sent_count += 1
-        print
-        self.id, len(self.sentences)
+        # print
+        # self.id, len(self.sentences)
 
     def parse_sentences(self, parser=None):
         if parser:

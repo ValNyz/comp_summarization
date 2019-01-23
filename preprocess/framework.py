@@ -1,43 +1,43 @@
 # -*- coding: utf-8 -*-
 
 """
-Load documents which are define in the file topics_{task.name}
+load documents which are define in the file topics_{task.name}
 
-__author__ : Valentin Nyzam
+__author__ : valentin nyzam
 """
 
 import sys
 import os
-import logging
 
 import preprocess.text as text
 import preprocess.util as util
 
-# from globals import ROOT
-# from globals import DATA_ROOT
+# from globals import root
+# from globals import data_root
 
+import logging
 logger = logging.getLogger(__name__)
 
 
 class SummaryProblem:
     """
-    A class for representing elements of a summary problem
-    self.id               'D0701'
-    self.title            'Southern Poverty Law Center'
+    a class for representing elements of a summary problem
+    self.id               'd0701'
+    self.title            'southern poverty law center'
     self.query            <title>: <narr>
-    self.docs_A_paths     a list of paths to the input documents
-    self.docs_B_paths     a list of paths to the input documents
-    self.docs_A           [Document1, ... ]
-    self.docs_B           [Document1, ... ]
-    self.annotators       set(['A', 'B', 'C', 'D'])
-    self.training         {'A': <summary A>, ... }
+    self.docs_a_paths     a list of paths to the input documents
+    self.docs_b_paths     a list of paths to the input documents
+    self.docs_a           [document1, ... ]
+    self.docs_b           [document1, ... ]
+    self.annotators       set(['a', 'b', 'c', 'd'])
+    self.training         {'a': <summary a>, ... }
     """
 
-    def __init__(self, id, title, docs_A, docs_B):
+    def __init__(self, id, title, docs_a, docs_b):
         self.id = id
         self.title = title
-        self.docs_A_paths = docs_A[:]
-        self.docs_B_paths = docs_B[:]
+        self.docs_a_paths = docs_a[:]
+        self.docs_b_paths = docs_b[:]
 
         # for checking state
         self.loaded_docs = False
@@ -45,26 +45,25 @@ class SummaryProblem:
         self.loaded_ir_docs = False
 
         # variables that might get set later
-        self.docs_A = None
-        self.docs_B = None
+        self.docs_a = None
+        self.docs_b = None
         self.training = {}
         self.annotators = set()
 
     def load_documents(self):
-        self.docs_A = []
-        self.docs_A = []
-        for path in self.docs_A_paths:
-            print(path)
+        self.docs_a = []
+        for path in self.docs_a_paths:
+            logger.debug(path)
             doc = text.Document(path)
             doc.get_sentences()
-            self.docs_A.append(doc)
+            self.docs_a.append(doc)
 
-        self.docs_B = []
-        for path in self.docs_B_paths:
-            print(path)
+        self.docs_b = []
+        for path in self.docs_b_paths:
+            logger.debug(path)
             doc = text.Document(path)
             doc.get_sentences()
-            self.docs_B.append(doc)
+            self.docs_b.append(doc)
 
         self.loaded_docs = True
 
@@ -93,12 +92,12 @@ class SummaryProblem:
                        encoding=encoding)
         par_fh = open(os.path.join(path, self.id + "-A" + par_file), 'w',
                        encoding=encoding)
-        for doc in self.docs_A:
+        for doc in self.docs_a:
             # count = 0
             for sent in doc.sentences:
                 # cleaning
                 if sent.original[0:2].islower():
-                    print('bad parse:', sent.original)
+                    logger.debug('bad parse:', sent.original)
                     continue
                 sent_fh.write('%s\n' % sent.original)  # % cleaned)
                 tok_fh.write('%s\n' % ' '.join(sent.tokens))
@@ -124,12 +123,12 @@ class SummaryProblem:
                        encoding=encoding)
         par_fh = open(os.path.join(path, self.id + "-B" + par_file), 'w',
                        encoding=encoding)
-        for doc in self.docs_B:
+        for doc in self.docs_b:
             # count = 0
             for sent in doc.sentences:
                 # cleaning
                 if sent.original[0:2].islower():
-                    print('bad parse:', sent.original.encode(encoding))
+                    logger.debug('bad parse:', sent.original.encode(encoding))
                     continue
                 sent_fh.write('%s\n' % sent.original)  # % cleaned)
                 tok_fh.write('%s\n' % ' '.join(sent.tokens))
@@ -146,36 +145,34 @@ class SummaryProblem:
 
     def __str__(self):
         s = []
-        s.append('%s SUMMARYPROBLEM' % '#START')
-        s.append('ID %s' % self.id)
-        s.append('TITLE %s' % self.title)
-        s.append('NARR %s' % self.narr)
-        s.append('DOCS_A %d\n%s' % (len(self.docs_A), '\n'.join(
-            ['%s' % n for n in self.docs_A])))
-        s.append('DOCS_B %d\n%s' % (len(self.docs_B), '\n'.join(
-            ['%s' % n for n in self.docs_B])))
+        s.append('%s summaryproblem' % '#start')
+        s.append('id %s' % self.id)
+        s.append('title %s' % self.title)
+        s.append('narr %s' % self.narr)
+        s.append('docs_a %d\n%s' % (len(self.docs_a), '\n'.join(
+            ['%s' % n for n in self.docs_a])))
+        s.append('docs_b %d\n%s' % (len(self.docs_b), '\n'.join(
+            ['%s' % n for n in self.docs_b])))
         for annotator in self.annotators:
-            s.append('TRAIN %s\n%s' % (annotator, '\n'.join(
+            s.append('train %s\n%s' % (annotator, '\n'.join(
                 ['%s' % n for n in self.training[annotator]])))
         return '\n'.join(s)
 
 
 def setup_task(task):
     """
-    task.topic_file: xml file for TAC
+    task.topic_file: xml file for tac
     task.doc_path: path containing source documents
     task.manual_path: path for manual (human) summaries
     """
 
     # get all document data
     all_docs = {}
-    # print(task.doc_path)
     logger.debug(task.doc_path)
     files = util.get_files(task.doc_path,
                                     r'[^_]+_?[^_]*_?\d+[\.\-]\d+')
     logger.debug(files)
-    # print(files)
-    sys.stderr.write('Loading [%d] files\n' % len(files))
+    logger.info('Loading [%d] files\n' % len(files))
     for file in files:
         logger.debug(file)
         id = os.path.basename(file)
@@ -207,10 +204,6 @@ def setup_task(task):
 
         if len(docsets) % 2 == 1:
             return
-        # import pdb
-        # pdb.set_trace()
-        # print(all_docs)
-        # print(doc_sets)
         for docset_index in range(0, len(docsets) - 1, 2):
 
             # map docids to documents
@@ -223,21 +216,21 @@ def setup_task(task):
 
             problems.append(problem)
 
-    sys.stderr.write('Setting up [%d] problems\n' % len(problems))
+    logger.info('Setting up [%d] problems\n' % len(problems))
     task.problems = problems
 
 
 def setup_sentences(task, parser=None, reload=False, options=None):
     # load problems quickly from pickle file
     if (not reload) and os.path.isfile(task.data_pickle):
-        sys.stderr.write('Loading [%s] problem data from [%s]\n'
+        logger.info('Loading [%s] problem data from [%s]\n'
                          % (task.name, task.data_pickle))
         task.problems = util.load_pickle(task.data_pickle)
         return
 
     # parse sentences
     for problem in task.problems:
-        sys.stderr.write('%s\n' % problem.id)
+        logger.debug('%s\n' % problem.id)
         problem.load_documents()
         if parser:
             for doc in problem.docs_A:
@@ -252,6 +245,6 @@ def setup_sentences(task, parser=None, reload=False, options=None):
             sentence.parsed = parsetree
 
     # save pickled version for faster loading later
-    sys.stderr.write('Saving [%s] problem data in [%s]\n'
+    logger.info('Saving [%s] problem data in [%s]\n'
                      % (task.name, task.data_pickle))
     util.save_pickle(task.problems, task.data_pickle)

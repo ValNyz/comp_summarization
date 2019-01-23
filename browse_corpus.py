@@ -54,6 +54,15 @@ class Sentence:
     def get_list_word(self):
         return self.tok
 
+    def get_list_word_no_stop(self):
+        return self.tok2
+
+    def get_list_lemm(self):
+        return self.lemm
+
+    def get_list_lemm_no_stop(self):
+        return self.lemm2
+
     def get_list_word_pos(self):
         return [(w, p) for p in self.lemm_pos for w in self.tok2]
 

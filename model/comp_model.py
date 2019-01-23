@@ -27,11 +27,6 @@ from globals import THREAD
 
 import logging
 logger = logging.getLogger(__name__)
-fh = logging.FileHandler(__name__ + ".log")
-fh.setLevel(logging.DEBUG)
-
-logger.addHandler(fh)
-
 
 class Comp_model(object):
     def __init__(self, l_sents, threshold=0.7):
@@ -63,7 +58,8 @@ class Comp_model(object):
             self._make_concept_pair()
             logger.info('Write concept pair similarity in ' + self.save_name)
             with open(self.save_name + '.model', 'w', encoding='utf-8') as f:
-                for tup in self.u_jk.keys():
+                for tup in self.s_jk.keys():
+                    logger.debug(tup)
                     j = tup[0]
                     k = tup[1]
                     f.write(' '.join(self.c_ij[0][j]) + '\t' +
@@ -88,12 +84,12 @@ class Comp_model(object):
                 if self.typ == 'pos':
                     sent = sentence.get_list_word_pos()
                 else:
-                    sent = sentence.get_list_word()
+                    sent = sentence.get_list_lemm_no_stop()
                 temp = []
                 if order > 1:
-                    temp.extend(list(ngrams(sent, order)))
-                for w in sent:
-                    temp.append((w,))
+                    temp.extend(list(ngrams(sent, order, pad_right=True)))
+                # for w in sent:
+                    # temp.append((w,))
                 # temp.extend(sent)
                 self.d_sentence[(i, j)] = len(self.s_ik[i])
                 self.s_ik[i].append(temp)
@@ -267,7 +263,7 @@ def _print_progress(q, done_q):
             counter = 0
             logger.info('Pairing queue : ' + str(q.qsize()))
             logger.info('Processing queue : ' + str(done_q.qsize()))
-        logger.debug(q.qsize())
+        # logger.debug(q.qsize())
         sleep(1)
 
 
@@ -493,18 +489,18 @@ class Comp_sentence_model(Comp_we):
         logger.info('Queuing complete')
 
         # block until all pair are processed.
-        # q.join()
+        q.join()
+        # sleep(0.2)
 
         counter_dq = 0
-        while not q.empty() or not done_q.empty():
-        # while not q.empty() or not done_q.empty():
+        while not (q.empty() and done_q.empty()):
             try:
                 tup = done_q.get()
                 j = tup[0][0]
                 k = tup[0][1]
 
                 self.u_jk[(j, k)] = tup[1]
-                if self.u_jk[(j, k)] is None:
+                if (j, k) not in self.s_jk:
                     self.s_jk[(j, k)] = [tup[2]]
                 else:
                     self.s_jk[(j, k)].append(tup[2])
@@ -523,8 +519,9 @@ class Comp_sentence_model(Comp_we):
         for t in threads:
             t.terminate()
 
-        for key in s_ij.keys():
-            s_ij[key] = sum(s_ij[key])/len(s_ij[key])
+        for key in self.s_jk.keys():
+            self.s_jk[key] = sum(self.s_jk[key])/len(self.s_jk[key])
+            logger.debug(str(key) + " : " + str(self.s_jk[key]))
 
         # done_q.join()
 
@@ -546,11 +543,12 @@ def _evaluate_pair_sentence(model, d_concept, s_ik, w_ij, q, done_q, threshold):
             k = item[1][0]
 
             sim = word_mover_distance(model, s_0.tok, s_1.tok)
+            logger.debug("_evaluate_pair_sentence : " + str(sim))
             if sim > threshold:
                 for c_0 in s_ik[0][j]:
-                    j_c = d_concept[c_0]
+                    j_c = d_concept[c_0][0]
                     for c_1 in s_ik[1][k]:
-                        k_c = d_concept[c_1]
+                        k_c = d_concept[c_1][1]
                         done_q.put(((j_c, k_c), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
             q.task_done()
         except queue.Empty:
@@ -595,7 +593,7 @@ def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
         set_doc_concept = set()
         for sent in doc:
             if order > 1:
-                set_doc_concept.update(ngrams(sent, order))
+                set_doc_concept.update(ngrams(sent, order, pad_right=True))
             for w in sent:
                 set_doc_concept.add(w)
         for concept in set_doc_concept:
@@ -631,6 +629,16 @@ def reuters_idf_dict(current_docs, file_name, order=2):
         l_docs = []
         for fileid in reuters.fileids():
             l_docs.append(reuters.sents(fileids=[fileid]))
+        for corpus in current_docs:
+            doc = []
+            prev_doc = ''
+            for sent in corpus:
+                doc.append(sent)
+                if sent.doc != prev_doc:
+                    l_docs.append(doc)
+                    doc = []
+                prev_doc = sent.doc
+
         dict_idf = make_concept_idf_dict(l_docs, order=order)
         with open(idf_file, 'w', encoding='utf-8') as f:
             for concept in dict_idf.keys():
@@ -639,8 +647,8 @@ def reuters_idf_dict(current_docs, file_name, order=2):
                         '\n')
                 else:
                     f.write(concept + '\t' + str(dict_idf[concept]) + '\n')
-        dict_idf = make_concept_idf_dict(current_docs, dict_idf,
-                                         len(reuters.fileids()))
+        # dict_idf = make_concept_idf_dict(current_docs, dict_idf,
+                                         # len(reuters.fileids()))
         return dict_idf
 
 

@@ -14,6 +14,7 @@ from globals import WE_MODEL
 from random import shuffle
 import time
 import cProfile
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -112,14 +113,13 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
     l_sen = []
     for s in range(len(s_ik[0])):
         l_sen.append((0, s))
-    for s in range(len(l_ik[1])):
+    for s in range(len(s_ik[1])):
         l_sen.append((1, s))
     shuffle(l_sen)
     s_0 = 0
     s_1 = 0
 
     for w_0 in range(sumSize + 1):
-        logger.info("Iteration " + str(w_0))
         start = time.process_time()
         for w_1 in range(sumSize + 1):
             for i in range(len(l_sen) + 1):
@@ -152,7 +152,9 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
                 else:
                     K[i][w_0][w_1] = K[i-1][w_0][w_1]
                 # print(K[i][w_0][w_1])
-        logger.info(str(time.process_time() - start))
+        logger.info("Iteration " + str(w_0) + " : " +
+                    str(K[len(K)-1][w_0][sumSize][0]))
+        logger.debug(str(time.process_time() - start))
     # print(K[len(l_sen)-1])
     return K[len(K)-1][sumSize][sumSize][1]
 
