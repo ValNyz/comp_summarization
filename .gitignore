@@ -14,12 +14,15 @@ treetagger
 *.idf
 *.model
 *.result
+*result
 testWiki
 *.py[cod]
+*.log
 
 ###############################
 #	FOLDER
 ###############################
+logs/
 data/
 output/
 __pycache__/
