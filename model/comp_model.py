@@ -22,7 +22,8 @@ from nltk.util import ngrams
 from nltk.corpus import wordnet as wn
 from scipy.spatial.distance import cosine
 from scipy.spatial.distance import euclidean
-from model.wmd import word_mover_distance
+from model.wmd import gensim_wmd
+# from model.wmd import word_mover_distance
 from globals import THREAD
 
 import logging
@@ -59,11 +60,12 @@ class Comp_model(object):
             logger.info('Write concept pair similarity in ' + self.save_name)
             with open(self.save_name + '.model', 'w', encoding='utf-8') as f:
                 for tup in self.s_jk.keys():
-                    logger.debug(tup)
                     j = tup[0]
                     k = tup[1]
-                    f.write(' '.join(self.c_ij[0][j]) + '\t' +
-                            ' '.join(self.c_ij[1][k]) + '\t' +
+                    f.write(' '.join([c for c in self.c_ij[0][j] if c is not
+                                      None]) + '\t' +
+                            ' '.join([c for c in self.c_ij[1][k] if c is not
+                                      None]) + '\t' +
                             str(self.u_jk[tup]) + '\t' +
                             str(self.s_jk[tup]) + '\n')
 
@@ -208,8 +210,13 @@ class Comp_wordnet(Comp_model):
 
 
 def _relevance_wordnet(model, w_0, w_1):
-    allsyns1 = set(ss for ss in wn.synsets(w_0))
-    allsyns2 = set(ss for ss in wn.synsets(w_1) if ss not in allsyns1)
+    try:
+        allsyns1 = set(ss for ss in wn.synsets(w_0))
+        allsyns2 = set(ss for ss in wn.synsets(w_1) if ss not in allsyns1)
+    except:
+        logger.error("Synsets : " + str(w_0))
+        logger.error("Synsets : " + str(w_1))
+        return 0
 
     if len(allsyns1) == 0 or len(allsyns2) == 0:
         return 0
@@ -232,6 +239,7 @@ class Comp_we(Comp_model):
 
         if not os.path.exists(self.save_name + '.model'):
             self._update_model(model_name)
+
     def _update_model(self, model_name):
         """_update_model
         update word embeddings model on self.l_sents for unseen word
@@ -252,6 +260,9 @@ class Comp_we(Comp_model):
                                    min_count=0,
                                    workers=THREAD)
             self.model.train(sents, total_examples=len(sents), epochs=10)
+        logger.info("Normalizing word2vec vectors...")
+        self.model.init_sims(replace=True)
+        logging.getLogger('gensim.corpora.dictionary').setLevel(logging.WARNING)
 
 
 def _print_progress(q, done_q):
@@ -284,9 +295,11 @@ def _evaluate_pair_word(model, w_ij, q, done_q, similarity, threshold):
                 c_1 = (c_1, )
             sim = 0
             for w_0 in c_0:
-                for w_1 in c_1:
-                    cos = similarity(model, w_0, w_1)
-                    sim += cos
+                if w_0 is not None:
+                    for w_1 in c_1:
+                        if w_1 is not None:
+                            cos = similarity(model, w_0, w_1)
+                            sim += cos
             sim = sim / (len(c_0) * len(c_1))
             done_q.put(((j, k), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
             q.task_done()
@@ -350,7 +363,7 @@ class Comp_we_wmd(Comp_we):
             Comp_model.__init__(self, l_sents, threshold)
         self.save_name = 'pair_we_wmd_' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_concept
-        self.sim = word_mover_distance
+        self.sim = gensim_wmd
         self._update_model(model_name)
 
 
@@ -445,7 +458,7 @@ class Comp_sentence_model(Comp_we):
 
         self.save_name = 'pair_sentence_' + l_sents[0][0].corpus[:-2]
         self.eval = _evaluate_pair_concept
-        self.sim = word_mover_distance
+        self.sim = gensim_wmd
         self.model = None
         self._update_model(model_name)
 
@@ -521,7 +534,6 @@ class Comp_sentence_model(Comp_we):
 
         for key in self.s_jk.keys():
             self.s_jk[key] = sum(self.s_jk[key])/len(self.s_jk[key])
-            logger.debug(str(key) + " : " + str(self.s_jk[key]))
 
         # done_q.join()
 
@@ -542,7 +554,9 @@ def _evaluate_pair_sentence(model, d_concept, s_ik, w_ij, q, done_q, threshold):
             j = item[0][0]
             k = item[1][0]
 
-            sim = word_mover_distance(model, s_0.tok, s_1.tok)
+            dis = gensim_wmd(s_0.tok, s_1.tok)
+            # dis = word_mover_distance(model, s_0.tok, s_1.tok)
+            sim = 1./(1. + dis)
             logger.debug("_evaluate_pair_sentence : " + str(sim))
             if sim > threshold:
                 for c_0 in s_ik[0][j]:
@@ -627,23 +641,24 @@ def reuters_idf_dict(current_docs, file_name, order=2):
     else:
         logger.info("Process reuters idf.")
         l_docs = []
-        for fileid in reuters.fileids():
-            l_docs.append(reuters.sents(fileids=[fileid]))
+        # for fileid in reuters.fileids():
+            # l_docs.append(reuters.sents(fileids=[fileid]))
+        doc = []
         for corpus in current_docs:
-            doc = []
-            prev_doc = ''
+            prev_doc = corpus[0].doc
             for sent in corpus:
-                doc.append(sent)
+                doc.append(sent.lemm2)
                 if sent.doc != prev_doc:
                     l_docs.append(doc)
                     doc = []
                 prev_doc = sent.doc
-
+            l_docs.append(doc)
+            doc = []
         dict_idf = make_concept_idf_dict(l_docs, order=order)
         with open(idf_file, 'w', encoding='utf-8') as f:
             for concept in dict_idf.keys():
-                if order > 1:
-                    f.write(' '.join(concept) + '\t' + str(dict_idf[concept]) +
+                if isinstance(concept, tuple):
+                    f.write(' '.join([c for c in concept if c is not None]) + '\t' + str(dict_idf[concept]) +
                         '\n')
                 else:
                     f.write(concept + '\t' + str(dict_idf[concept]) + '\n')

@@ -23,16 +23,18 @@ def score_sentence_knapsack(model, threshold, *l_sents):
     # kp = comp_model.Comp_wordnet(l_sents, threshold)
     kp = model #  comp_model.Comp_we(WE_MODEL, l_sents, threshold)
 
-    kp.prepare()
+    # kp.prepare()
     ocs_ikj = [[[kp.d_concept[c] for c in sen] for sen in kp.s_ik[doc]]
                for doc in range(len(kp.c_ij))]
     # print(ocs_ikj)
     # dict_idf = idf.generate_idf('u08')
     dict_idf = comp_model.reuters_idf_dict(l_sents, "reuters")
     for concept in kp.w_ij[0].keys():
-        kp.w_ij[0][concept] = kp.w_ij[0][concept]*dict_idf[concept]
+        kp.w_ij[0][concept] = kp.w_ij[0][concept]*dict_idf[tuple([c for c in concept
+                                                           if c is not None])]
     for concept in kp.w_ij[1].keys():
-        kp.w_ij[1][concept] = kp.w_ij[1][concept]*dict_idf[concept]
+        kp.w_ij[1][concept] = kp.w_ij[1][concept]*dict_idf[tuple([c for c in concept
+                                                           if c is not None])]
 
     # cp = cProfile.Profile()
     # cp.enable()
@@ -115,6 +117,7 @@ def bi_knapsack(sumSize, c_ij, ocs_ikj, w_ij, u_jk, s_ik, l_ik):
         l_sen.append((0, s))
     for s in range(len(s_ik[1])):
         l_sen.append((1, s))
+    logger.debug(l_sen)
     shuffle(l_sen)
     s_0 = 0
     s_1 = 0

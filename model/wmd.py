@@ -13,20 +13,17 @@ import pulp
 
 import logging
 logger = logging.getLogger(__name__)
-fh = logging.FileHandler(__name__ + ".log")
-fh.setLevel(logging.DEBUG)
-
-logger.addHandler(fh)
-
 
 # lock = threading.Lock()
 
+def gensim_wmd(model, sent1, sent2):
+    return model.wmdistance(sent1, sent2)
 
 def word_mover_distance(wvmodel, first_sent_tokens, second_sent_tokens,
                         lpFile=None):
     prob = _word_mover_distance_probspec(first_sent_tokens, second_sent_tokens,
                                          wvmodel, lpFile=lpFile)
-    # print(pulp.value(prob.objective))
+    # logger.debug(pulp.value(prob.objective))
     return pulp.value(prob.objective)
 
 
@@ -63,7 +60,7 @@ def _word_mover_distance_probspec(sent1, sent2, wvmodel, lpFile=None):
     try:
         prob.solve()
     except Exception:
-        logger.info('Problem infeasible')
+        logger.error('Problem infeasible')
 
     # logger.info("Status:", pulp.LpStatus[prob.status])
 

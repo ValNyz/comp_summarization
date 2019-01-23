@@ -20,7 +20,7 @@ def score_sentence_ilp(model, threshold, *l_sents):
     ilp = model
     # ilp = comp_model.Comp_wordnet(l_sents, threshold)
     # ilp = comp_model.Comp_we(WE_MODEL, l_sents, threshold)
-    ilp.prepare()
+    # ilp.prepare()
     # docs = []
     # p_doc_name = ""
     # doc_id = -1
@@ -36,9 +36,15 @@ def score_sentence_ilp(model, threshold, *l_sents):
     dict_idf = comp_model.reuters_idf_dict(l_sents, "reuters")
     # dict_idf = idf.generate_idf('tac_08')
     for concept in ilp.w_ij[0].keys():
-        ilp.w_ij[0][concept] = ilp.w_ij[0][concept]*dict_idf[concept]
+        ilp.w_ij[0][concept] = ilp.w_ij[0][concept]*dict_idf[tuple([c for c in
+                                                                    concept if
+                                                                   c is not
+                                                                    None])]
     for concept in ilp.w_ij[1].keys():
-        ilp.w_ij[1][concept] = ilp.w_ij[1][concept]*dict_idf[concept]
+        ilp.w_ij[1][concept] = ilp.w_ij[1][concept]*dict_idf[tuple([c for c in
+                                                                    concept if
+                                                                   c is not
+                                                                    None])]
     return solve_ilp_problem(l_sents, ilp.c_ij, ilp.w_ij, ilp.u_jk,
                                 ilp.s_ik, ilp.l_ik)
 
