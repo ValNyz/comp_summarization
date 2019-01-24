@@ -15,7 +15,7 @@ from globals import THREAD
 from globals import LOG_LEVEL
 from globals import WE_MODEL
 from knapsack import score_sentence_knapsack
-from knapsack2 import score_sentence_knapsack2
+from sentence_knapsack import score_sentence_knapsack2
 from ilp import score_sentence_ilp
 from minimum_dominating_set import score_sentences_MDS
 # from cross_entropy_summary import score_sentences_cross_entropy
@@ -54,7 +54,7 @@ def make_comp_summary(comparative, model, threshold,
         c_model = comp_model.Comp_we_min_cosinus(WE_MODEL, l_sents, threshold)
     elif model == 'WE_EUC':
         c_model = comp_model.Comp_we_min_euclidean(WE_MODEL, l_sents, threshold)
-    elif model == 'WE_SENT_WMD':
+    elif model == 'WE_SEN_WMD':
         c_model = comp_sent_model.Comp_sent_model(WE_MODEL, l_sents, threshold)
     elif model == 'WE_SEN':
         c_model = comp_model.Comp_sentence_model(WE_MODEL, l_sents, threshold)

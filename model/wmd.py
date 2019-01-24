@@ -19,10 +19,9 @@ logger = logging.getLogger(__name__)
 def gensim_wmd(model, sent1, sent2):
     return model.wmdistance(sent1, sent2)
 
-def word_mover_distance(wvmodel, first_sent_tokens, second_sent_tokens,
-                        lpFile=None):
-    prob = _word_mover_distance_probspec(first_sent_tokens, second_sent_tokens,
-                                         wvmodel, lpFile=lpFile)
+def word_mover_distance(model, sent1, sent2, lpFile=None):
+    prob = _word_mover_distance_probspec(sent1, sent2,
+                                         model, lpFile=lpFile)
     # logger.debug(pulp.value(prob.objective))
     return pulp.value(prob.objective)
 

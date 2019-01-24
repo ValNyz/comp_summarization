@@ -89,9 +89,9 @@ class Comp_model(object):
                     sent = sentence.get_list_lemm_no_stop()
                 temp = []
                 if order > 1:
-                    temp.extend(list(ngrams(sent, order, pad_right=True)))
-                # for w in sent:
-                    # temp.append((w,))
+                    temp.extend(list(ngrams(sent, order)))
+                for w in sent:
+                    temp.append((w,))
                 # temp.extend(sent)
                 self.d_sentence[(i, j)] = len(self.s_ik[i])
                 self.s_ik[i].append(temp)
@@ -263,6 +263,7 @@ class Comp_we(Comp_model):
         logger.info("Normalizing word2vec vectors...")
         self.model.init_sims(replace=True)
         logging.getLogger('gensim.corpora.dictionary').setLevel(logging.WARNING)
+        logging.getLogger('gensim.models.keyedvectors').setLevel(logging.WARNING)
 
 
 def _print_progress(q, done_q):
@@ -502,8 +503,8 @@ class Comp_sentence_model(Comp_we):
         logger.info('Queuing complete')
 
         # block until all pair are processed.
-        q.join()
-        # sleep(0.2)
+        # q.join()
+        sleep(0.2)
 
         counter_dq = 0
         while not (q.empty() and done_q.empty()):
@@ -525,7 +526,6 @@ class Comp_sentence_model(Comp_we):
             except queue.Empty:
                 logger.info("Done_q is empty")
                 sleep(0.1)
-                pass
         logger.info("Processing complete")
 
         # stop workers
@@ -554,7 +554,7 @@ def _evaluate_pair_sentence(model, d_concept, s_ik, w_ij, q, done_q, threshold):
             j = item[0][0]
             k = item[1][0]
 
-            dis = gensim_wmd(s_0.tok, s_1.tok)
+            dis = gensim_wmd(model, s_0.tok, s_1.tok)
             # dis = word_mover_distance(model, s_0.tok, s_1.tok)
             sim = 1./(1. + dis)
             logger.debug("_evaluate_pair_sentence : " + str(sim))
@@ -607,7 +607,8 @@ def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
         set_doc_concept = set()
         for sent in doc:
             if order > 1:
-                set_doc_concept.update(ngrams(sent, order, pad_right=True))
+                set_doc_concept.update(ngrams(sent, order))
+            set_doc_concept.update(ngrams(sent, 1))
             for w in sent:
                 set_doc_concept.add(w)
         for concept in set_doc_concept:
@@ -627,22 +628,7 @@ def reuters_idf_dict(current_docs, file_name, order=2):
     idf_file = file_name + '_' + str(order) + ".idf"
     dict_idf = {}
     if os.path.exists(idf_file):
-        with open(idf_file, 'r', encoding='utf-8') as f:
-            for line in f:
-                values = line.split("\t")
-                # print(values)
-                if order > 1:
-                    dict_idf[tuple(values[0].split())] = float(values[1])
-                else:
-                    dict_idf[values[0]] = float(values[1])
-        dict_idf = make_concept_idf_dict(current_docs, dict_idf,
-                                         len(reuters.fileids()))
-        return dict_idf
-    else:
-        logger.info("Process reuters idf.")
         l_docs = []
-        # for fileid in reuters.fileids():
-            # l_docs.append(reuters.sents(fileids=[fileid]))
         doc = []
         for corpus in current_docs:
             prev_doc = corpus[0].doc
@@ -654,6 +640,22 @@ def reuters_idf_dict(current_docs, file_name, order=2):
                 prev_doc = sent.doc
             l_docs.append(doc)
             doc = []
+        with open(idf_file, 'r', encoding='utf-8') as f:
+            for line in f:
+                values = line.split("\t")
+                # print(values)
+                if order > 1:
+                    dict_idf[tuple(values[0].split())] = float(values[1])
+                else:
+                    dict_idf[values[0]] = float(values[1])
+        dict_idf = make_concept_idf_dict(l_docs, dict_idf,
+                                         len(reuters.fileids()))
+        return dict_idf
+    else:
+        logger.info("Process reuters idf.")
+        l_docs = []
+        for fileid in reuters.fileids():
+            l_docs.append(reuters.sents(fileids=[fileid]))
         dict_idf = make_concept_idf_dict(l_docs, order=order)
         with open(idf_file, 'w', encoding='utf-8') as f:
             for concept in dict_idf.keys():
@@ -662,57 +664,18 @@ def reuters_idf_dict(current_docs, file_name, order=2):
                         '\n')
                 else:
                     f.write(concept + '\t' + str(dict_idf[concept]) + '\n')
-        # dict_idf = make_concept_idf_dict(current_docs, dict_idf,
-                                         # len(reuters.fileids()))
+        l_docs = []
+        doc = []
+        for corpus in current_docs:
+            prev_doc = corpus[0].doc
+            for sent in corpus:
+                doc.append(sent.lemm2)
+                if sent.doc != prev_doc:
+                    l_docs.append(doc)
+                    doc = []
+                prev_doc = sent.doc
+            l_docs.append(doc)
+            doc = []
+        dict_idf = make_concept_idf_dict(l_docs, dict_idf,
+                                         len(reuters.fileids()))
         return dict_idf
-
-
-WN_NOUN = 'n'
-WN_VERB = 'v'
-WN_ADJECTIVE = 'a'
-WN_ADJECTIVE_SATELLITE = 's'
-WN_ADVERB = 'r'
-
-
-def transform_POS(pos):
-    pos_dict = \
-            {
-                'CC': None,
-                'CD': None,
-                'DT': None,
-                'EX': None,
-                'FW': None,
-                'IN': None,
-                'JJ': WN_ADJECTIVE,
-                'JJR': WN_ADJECTIVE,
-                'JJS': WN_ADJECTIVE,
-                'LS': None,
-                'MD': None,
-                'NN': WN_NOUN,
-                'NNS': WN_NOUN,
-                'NP': WN_NOUN,
-                'NPS': WN_NOUN,
-                'PDT': None,
-                'POS': None,
-                'PP': None,
-                'PP$': None,
-                'RB': WN_ADVERB,
-                'RBR': WN_ADVERB,
-                'RBS': WN_ADVERB,
-                'RP': None,
-                'SYM': None,
-                'TO': None,
-                'UH': None,
-                'VB': WN_VERB,
-                'VBD': WN_VERB,
-                'VBG': WN_VERB,
-                'VBN': WN_VERB,
-                'VBP': WN_VERB,
-                'VBZ': WN_VERB,
-                'WDT': None,
-                'WP': None,
-                'WP$': None,
-                'WRB': None,
-                'u': None
-            }
-    return pos_dict[pos]
