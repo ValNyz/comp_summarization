@@ -39,8 +39,8 @@ class Comp_sent_model(object):
         self.d_id_sents_corpus = {}
         for i in range(len(self.l_sents)):
             for j in range(len(self.l_sents[i])):
-                self.d_id_sents.append((i, j))
                 self.d_id_sents_corpus[(i, j)] = len(self.d_id_sents)
+                self.d_id_sents.append((i, j))
         self.docs = []
         doc = []
         for corpus in self.l_sents:
@@ -71,7 +71,6 @@ class Comp_sent_model(object):
         lxr = LexRank_wmd()
 
         self.d_sen_score = lxr.rank_sentences(len(self.d_id_sents), self.d_sen_sim)
-        logger.info(self.d_sen_score)
 
     def _update_model(self, model_name):
         """_update_model
@@ -120,7 +119,7 @@ class Comp_sent_model(object):
 
 
         threads = []
-        for _ in range(THREAD/2):
+        for _ in range(int(THREAD/2)):
             t = Process(target=_pair_consumer, args=(queue_in, queue_out,
                                                      self.model,
                                                      self.d_id_sents,
@@ -142,8 +141,8 @@ class Comp_sent_model(object):
         # queue_in.join()
 
         counter = 0
-        while not (queue_in.empty() and queue_out.empty()):
-        # while counter < size:
+        # while not (queue_in.empty() and queue_out.empty()):
+        while counter < size:
             try:
                 item = queue_out.get()
                 i = item[0]

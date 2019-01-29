@@ -17,11 +17,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 def score_sentence_knapsack2(model, threshold, *l_sents):
-    score_sen = model.d_sen_score
-    sim_sen = model.d_sen_sim
+    d_sen_score = model.d_sen_score
+    d_sen_sim = model.d_sen_sim
     d_id_sen = model.d_id_sents_corpus
 
-    id_summary = bi_knapsack(100, d_id_sen, sen_score, sen_sim, l_sents)
+    id_summary = bi_knapsack(100, d_id_sen, d_sen_score, d_sen_sim, l_sents)
 
     summary_A = [l_sents[0][i[1]] for i in id_summary if i[0] == 0]
     summary_B = [l_sents[1][i[1]] for i in id_summary if i[0] == 1]
@@ -30,7 +30,7 @@ def score_sentence_knapsack2(model, threshold, *l_sents):
 
 # A Dynamic Programming based Python Program for 0-1 Knapsack problem
 # Returns the maximum value that can be put in a knapsack of capacity W
-def bi_knapsack(sumSize, d_id_sen, sen_score, sen_sim, *l_sents):
+def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
     """knapsack
 
     """
@@ -85,14 +85,14 @@ def bi_knapsack(sumSize, d_id_sen, sen_score, sen_sim, *l_sents):
                     K[i][w_0][w_1] = K[i-1][w_0][w_1]
                 # print(K[i][w_0][w_1])
         logger.info("Iteration " + str(w_0) + " : " +
-                    K[len(K)-1][w_0][sumSize][0])
+                    str(K[len(K)-1][w_0][sumSize][0]))
     logger.info('Knapsack execution time : ' + str(time.process_time() - start))
     # print(K[len(l_sen)-1])
     return K[len(K)-1][sumSize][sumSize][1]
 
-def obj(lambd, d_id_sen, sen_score, sen_sim, summary):
-    l_s1 = []
-    l_s2 = []
+def obj(lambd, d_id_sen, d_sen_score, d_sen_sim, summary):
+    ls_1 = []
+    ls_2 = []
     for sen in summary:
         if sen[0] == 0:
             ls_1.append(d_id_sen[(sen[0], sen[1])])
