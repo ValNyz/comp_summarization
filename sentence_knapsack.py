@@ -38,6 +38,8 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
     for i, corpus in enumerate(l_sents):
         for j, sen in enumerate(corpus):
             l_sen.append((i, j, sen))
+    # print(l_sen)
+    # exit()
     shuffle(l_sen)
 
     lambd = 0.55
@@ -60,8 +62,10 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
                 sen = l_sen[i-1][1]
                 sentence = l_sen[i-1][2]
                 if cor == 0 and sentence.len <= w_0:
-                    current_sum = list(K[i-1][w_0-sentence.len][w_1][1])
-                    current_sum.append(l_sen[i-1])
+                    current_sum = set(K[i-1][w_0-sentence.len][w_1][1])
+                    current_sum.add(l_sen[i-1])
+                    # current_sum = list(K[i-1][w_0-sentence.len][w_1][1])
+                    # current_sum.append(l_sen[i-1])
                     value = obj(lambd, d_id_sen, d_sen_score, d_sen_sim, current_sum)
                     if value > K[i-1][w_0][w_1][0]:
                         # print(value)
@@ -71,8 +75,10 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
                     else:
                         K[i][w_0][w_1] = K[i-1][w_0][w_1]
                 elif cor == 1 and sentence.len <= w_1:
-                    current_sum = list(K[i-1][w_0][w_1-sentence.len][1])
-                    current_sum.append(l_sen[i-1])
+                    current_sum = set(K[i-1][w_0][w_1-sentence.len][1])
+                    current_sum.add(l_sen[i-1])
+                    # current_sum = list(K[i-1][w_0][w_1-sentence.len][1])
+                    # current_sum.append(l_sen[i-1])
                     value = obj(lambd, d_id_sen, d_sen_score, d_sen_sim, current_sum)
                     if value > K[i-1][w_0][w_1][0]:
                         # print(value)
@@ -112,4 +118,9 @@ def obj(lambd, d_id_sen, d_sen_score, d_sen_sim, summary):
                 rep += d_sen_score[s2]
         if t_rep:
             t_rep = False
-    return lambd*comp + (1-lambd)*rep
+    
+    score = lambd*comp + (1-lambd)*rep
+    nb_sen = len(ls_1) + len(ls_2)
+    print(score)
+    print(nb_sen)
+    return score / nb_sen

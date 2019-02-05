@@ -23,7 +23,7 @@ class Sentence:
             self.tok = [word for word in tp.remove_punct(tok).split()
                         if len(word) > 0]
             self.tok2 = tp.remove_stopwords(self.tok)
-        self.len = len(tok)
+        self.len = len(self.tok)
         if lemm is not None:
             # self.pos = pos.split()
             self.lemm = [word for word in tp.remove_punct(lemm).split()
