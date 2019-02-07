@@ -628,18 +628,7 @@ def reuters_idf_dict(current_docs, file_name, order=2):
     idf_file = file_name + '_' + str(order) + ".idf"
     dict_idf = {}
     if os.path.exists(idf_file):
-        l_docs = []
-        doc = []
-        for corpus in current_docs:
-            prev_doc = corpus[0].doc
-            for sent in corpus:
-                doc.append(sent.lemm2)
-                if sent.doc != prev_doc:
-                    l_docs.append(doc)
-                    doc = []
-                prev_doc = sent.doc
-            l_docs.append(doc)
-            doc = []
+        l_docs = list_sen_corpus_to_list_sen_doc(current_docs)
         with open(idf_file, 'r', encoding='utf-8') as f:
             for line in f:
                 values = line.split("\t")
@@ -664,18 +653,23 @@ def reuters_idf_dict(current_docs, file_name, order=2):
                         '\n')
                 else:
                     f.write(concept + '\t' + str(dict_idf[concept]) + '\n')
-        l_docs = []
-        doc = []
-        for corpus in current_docs:
-            prev_doc = corpus[0].doc
-            for sent in corpus:
-                doc.append(sent.lemm2)
-                if sent.doc != prev_doc:
-                    l_docs.append(doc)
-                    doc = []
-                prev_doc = sent.doc
-            l_docs.append(doc)
-            doc = []
+        l_docs = list_sen_corpus_to_list_sen_doc(current_docs, l_docs)
         dict_idf = make_concept_idf_dict(l_docs, dict_idf,
                                          len(reuters.fileids()))
         return dict_idf
+
+
+def list_sen_corpus_to_list_sen_doc(current_docs, l_docs=[]):
+    doc = []
+    for corpus in current_docs:
+        prev_doc = corpus[0].doc
+        for sent in corpus:
+            doc.append(sent)
+            if sent.doc != prev_doc:
+                l_docs.append(doc)
+                doc = []
+            prev_doc = sent.doc
+        l_docs.append(doc)
+        doc = []
+    return l_docs
+

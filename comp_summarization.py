@@ -101,7 +101,8 @@ def parse_options():
     parser = OptionParser(usage=usage)
 
     parser.add_option('-t', '--threshold', dest='threshold', type='float',
-                      help='threshold for selection of comparative pair')
+                      help='threshold for selection of comparative pair',
+                      default=0.55)
     parser.add_option('-k', '--task', dest='task', type='str',
                       help='task name')
     parser.add_option('--docpath', dest='docpath', type='str',

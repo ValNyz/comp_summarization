@@ -7,6 +7,7 @@ Inspired by :
     Comparative News Summarization Using Linear Programming (Huang et al, 2011)
 __author__ : Valentin Nyzam
 """
+
 from model import comp_model
 from globals import WE_MODEL
 from random import shuffle
@@ -16,12 +17,16 @@ import time
 import logging
 logger = logging.getLogger(__name__)
 
-def score_sentence_knapsack2(model, threshold, *l_sents):
+def score_sentence_knapsack2(model, lambd, *l_sents):
     d_sen_score = model.d_sen_score
+    tf_docs = model.tf_docs
+    idf = model.idf
+    max_score = model.max_score
+    min_score = model.min_score
     d_sen_sim = model.d_sen_sim
     d_id_sen = model.d_id_sents_corpus
 
-    id_summary = bi_knapsack(100, d_id_sen, d_sen_score, d_sen_sim, l_sents)
+    id_summary = bi_knapsack(100, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, l_sents)
 
     summary_A = [l_sents[0][i[1]] for i in id_summary if i[0] == 0]
     summary_B = [l_sents[1][i[1]] for i in id_summary if i[0] == 1]
@@ -30,7 +35,7 @@ def score_sentence_knapsack2(model, threshold, *l_sents):
 
 # A Dynamic Programming based Python Program for 0-1 Knapsack problem
 # Returns the maximum value that can be put in a knapsack of capacity W
-def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
+def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, l_sents):
     """knapsack
 
     """
@@ -42,7 +47,6 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
     # exit()
     shuffle(l_sen)
 
-    lambd = 0.55
     # K = cube of (value, summary (as a list of tuple (as coordinate of
     # sentence)))
     K = [[[[0, []] for w2 in range(sumSize + 1)]
@@ -66,8 +70,8 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
                     current_sum.add(l_sen[i-1])
                     # current_sum = list(K[i-1][w_0-sentence.len][w_1][1])
                     # current_sum.append(l_sen[i-1])
-                    value = obj(lambd, d_id_sen, d_sen_score, d_sen_sim, current_sum)
-                    if value > K[i-1][w_0][w_1][0]:
+                    value = obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, current_sum)
+                    if value >= K[i-1][w_0][w_1][0]:
                         # print(value)
                         # print(current_sum)
                         K[i][w_0][w_1][0] = value
@@ -79,8 +83,8 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
                     current_sum.add(l_sen[i-1])
                     # current_sum = list(K[i-1][w_0][w_1-sentence.len][1])
                     # current_sum.append(l_sen[i-1])
-                    value = obj(lambd, d_id_sen, d_sen_score, d_sen_sim, current_sum)
-                    if value > K[i-1][w_0][w_1][0]:
+                    value = obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, current_sum)
+                    if value >= K[i-1][w_0][w_1][0]:
                         # print(value)
                         # print(current_sum)
                         K[i][w_0][w_1][0] = value
@@ -96,10 +100,18 @@ def bi_knapsack(sumSize, d_id_sen, d_sen_score, d_sen_sim, l_sents):
     # print(K[len(l_sen)-1])
     return K[len(K)-1][sumSize][sumSize][1]
 
-def obj(lambd, d_id_sen, d_sen_score, d_sen_sim, summary):
+def obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, summary):
     ls_1 = []
     ls_2 = []
+    rep = 0
+    set_word = set()
     for sen in summary:
+        temp = 0
+        for word in sen[2]:
+            if word not in set_word:
+                temp += tf_docs[sen[2].doc][word] * idf[word]
+                set_word.add(word)
+        rep += (temp - min_score)/(max_score - min_score)
         if sen[0] == 0:
             ls_1.append(d_id_sen[(sen[0], sen[1])])
             # ls_1.append(sen)
@@ -107,20 +119,35 @@ def obj(lambd, d_id_sen, d_sen_score, d_sen_sim, summary):
             ls_2.append(d_id_sen[(sen[0], sen[1])])
             # ls_2.append(sen)
 
-    t_rep = True
+    # t_rep = True
     comp = 0
-    rep = 0
+    # rep = 0
     for s1 in ls_1:
-        rep += d_sen_score[s1]
+        # rep += d_sen_score[s1]
         for s2 in ls_2:
             comp += d_sen_sim[(s1, s2)]
-            if t_rep:
-                rep += d_sen_score[s2]
-        if t_rep:
-            t_rep = False
-    
+            # if t_rep:
+                # rep += d_sen_score[s2]
+        # if t_rep:
+            # t_rep = False
+
+    # nb_token = 0
+    # nb_common_token = 0
+    # common_token = set()
+    # for tup in summary:
+        # sent = tup[2]
+        # nb_token += len(sent)
+        # for token in sent:
+            # if token not in common_token:
+                # common_token.add(token)
+            # else:
+                # nb_common_token += 1
+
+    # red = nb_common_token/nb_token
     score = lambd*comp + (1-lambd)*rep
     nb_sen = len(ls_1) + len(ls_2)
-    print(score)
-    print(nb_sen)
+    # red = 0
+    # if (red > score):
     return score / nb_sen
+    # else:
+        # return (score - red)/nb_sen

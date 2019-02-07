@@ -5,10 +5,13 @@ Comparative summarization model using sentence to sentence similarity
 
 __author__ : Valentin Nyzam
 """
+from collections import Counter
 
 from browse_corpus import build_dicts
 from model.comp_model import reuters_idf_dict
-from model.lexrank_wmd import LexRank_wmd
+from model.comp_model import list_sen_corpus_to_list_sen_doc
+# from model.lexrank_wmd import LexRank_wmd
+from lexrank import LexRank
 
 from model.wmd import gensim_wmd
 from model.wmd import word_mover_distance
@@ -26,13 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 class Comp_sent_model(object):
-    def __init__(self, model_name, l_sents, threshold=0.7):
+    def __init__(self, model_name, l_sents, lambd=0.55, lexrank=False):
         self.model_name = model_name
         self.l_sents = l_sents
-        self.threshold = threshold
+        self.lambd = lambd
         self.save_name = 'pair_sentence_wmd_' + l_sents[0][0].corpus[:-2]
         self.typ = 'sent'
         self.d_sen_sim = {}
+        self.lexrank = lexrank
 
     def prepare(self):
         self.d_id_sents = []
@@ -41,18 +45,7 @@ class Comp_sent_model(object):
             for j in range(len(self.l_sents[i])):
                 self.d_id_sents_corpus[(i, j)] = len(self.d_id_sents)
                 self.d_id_sents.append((i, j))
-        self.docs = []
-        doc = []
-        for corpus in self.l_sents:
-            prev_doc = corpus[0].doc
-            for sent in corpus:
-                doc.append(sent.lemm2)
-                if sent.doc != prev_doc:
-                    self.docs.append(doc)
-                    doc = []
-                prev_doc = sent.doc
-            self.docs.append(doc)
-            doc = []
+        self.docs = list_sen_corpus_to_list_sen_doc(self.l_sents)
 
         # self.d_id_word, self.d_word_id = build_dicts(self.l_sents)
 
@@ -68,9 +61,36 @@ class Comp_sent_model(object):
                 for item, value in self.d_sen_sim.items():
                     f.write(str(item[0]) + '\t' + str(item[1]) + '\t' +
                             str(value) + '\n')
-        lxr = LexRank_wmd()
+        if self.lexrank:
+            print('Lexrank')
+            # lxr = LexRank()
+            # self.d_sen_score = lxr.rank_sentences(*l_sents)
+            # lxr = LexRank_wmd()
+            # self.d_sen_score = lxr.rank_sentences(len(self.d_id_sents), self.d_sen_sim)
+        else:
+            self.d_sen_score, self.tf_docs, self.idf = self.computeTfIdf()
+        self.max_score = max(self.d_sen_score)
+        self.min_score = min(self.d_sen_score)
+        diff = self.max_score - self.min_score
+        for i in range(len(self.d_sen_score)):
+            self.d_sen_score[i] = (self.d_sen_score[i] - self.min_score) / diff
 
-        self.d_sen_score = lxr.rank_sentences(len(self.d_id_sents), self.d_sen_sim)
+
+    def computeTfIdf(self):
+        idf = reuters_idf_dict(self.l_sents, 'reuters', 1)
+        d_sen_score = []
+        tf_docs = {}
+        for doc in self.docs:
+            words = [word for sent in doc for word in sent]
+            tf = Counter(words)
+            for sent in doc:
+                if sent.doc not in tf_docs:
+                    tf_docs[sent.doc] = tf
+                score = 0
+                for word in sent:
+                    score += tf[word]*idf[word]
+                d_sen_score.append(score)
+        return d_sen_score, tf_docs, idf
 
     def _update_model(self, model_name):
         """_update_model
@@ -92,8 +112,8 @@ class Comp_sent_model(object):
                                    min_count=0,
                                    workers=THREAD)
             self.model.train(sents, total_examples=len(sents), epochs=10)
-        logger.info("Normalizing word2vec vectors...")
-        self.model.init_sims(replace=True)
+        # logger.info("Normalizing word2vec vectors...")
+        # self.model.init_sims(replace=True)
         logging.getLogger('gensim.models.base_any2vec').setLevel(logging.WARNING)
         logging.getLogger('gensim.models.keyedvectors').setLevel(logging.WARNING)
         logging.getLogger('gensim.corpora.dictionary').setLevel(logging.WARNING)
@@ -104,11 +124,23 @@ class Comp_sent_model(object):
                 pair = line.split('\t')
                 s_0 = int(pair[0])
                 s_1 = int(pair[1])
-                if float(pair[2].strip()) >= self.threshold:
-                    self.d_sen_sim[(s_0, s_1)] = float(pair[2].strip())
+                self.d_sen_sim[(s_0, s_1)] = float(pair[2].strip())
+        # temp_sorted = sorted(self.d_sen_sim.items(), reverse=True, key= lambda tup: tup[1])
+        # for i in range(90):
+            # tup = temp_sorted[i]
+            # s1 = self.d_id_sents[tup[0][0]]
+            # s2 = self.d_id_sents[tup[0][1]]
+            # if s1[0] != s2[0]:
+                # print(s1)
+                # print(s2)
+                # s1 = self.l_sents[s1[0]][s1[1]]
+                # s2 = self.l_sents[s2[0]][s2[1]]
+                # print(str(s1) + "\n" + str(s2) + "\n" + str(tup[1]))
 
     def _make_sentence_pair(self):
-        size = int(((len(self.d_id_sents)-1)*len(self.d_id_sents))/2)
+        nb_sen_1 = len(self.l_sents[0])
+        nb_sen_2 = len(self.l_sents[1])
+        size = nb_sen_1*nb_sen_2
         logger.info(str(size) + ' concept pairs to test')
         queue_in = JoinableQueue()
         queue_out = Queue()
@@ -131,9 +163,12 @@ class Comp_sent_model(object):
         print_thread.start()
         threads.append(print_thread)
 
-        for i in range(len(self.d_id_sents)):
-            for j in range(i+1, len(self.d_id_sents)):
+        for i in range(nb_sen_1):
+            for j in range(nb_sen_1, nb_sen_1+nb_sen_2):
                 queue_in.put((i, j))
+        # for i in range(len(self.d_id_sents)):
+            # for j in range(i+1, len(self.d_id_sents)):
+                # queue_in.put((i, j))
                 # logger.info('Producer : ' + str(queue.qsize()))
         logger.info('Queuing complete')
 

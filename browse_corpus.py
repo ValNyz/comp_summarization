@@ -119,7 +119,7 @@ def load_sents(input_path, corpus_id, encoding='utf-8'):
         if doc != prev_doc:
             order = 0
         s = Sentence(corpus, count, order, orig, doc, tok, lemm, parse, par)
-        if len(s.tok2) > 0:
+        if len(s.tok) > 8:
             sents.append(s)
             order += 1
             count += 1
