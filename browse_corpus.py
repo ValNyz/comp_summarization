@@ -132,13 +132,13 @@ def load_sents(input_path, corpus_id, encoding='utf-8'):
 def build_dicts(*l_sents):
     """
     build dicts of words for the list of Sentence l_sentences
-    :param l_sentences: list: [list of Sentence]
+    :param l_sentences: list: [list of [list of word]
     :return: dict_int: dict of (int:str)
     :return: dict_str: dict of (str:int)
     """
     dict_str = {}
     dict_int = {}
-    for sen in chain(*l_sents):
+    for sen in chain(l_sents):
         for word in sen:
             if word not in dict_str:
                 dict_int[len(dict_int)] = word
@@ -153,4 +153,4 @@ def str_sent_to_int_sent(dict_str, sent):
     :param sent: list: list of Sentence
     :return: list: list of int
     """
-    return [dict_str(word) for word in sent if word in dict_str]
+    return [dict_str[word] for word in sent if word in dict_str]

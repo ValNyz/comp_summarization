@@ -17,7 +17,7 @@ from globals import WE_MODEL
 from knapsack import score_sentence_knapsack
 from sentence_knapsack import score_sentence_knapsack2
 from ilp import score_sentence_ilp
-from minimum_dominating_set import score_sentences_MDS
+# from minimum_dominating_set import score_sentences_MDS
 # from cross_entropy_summary import score_sentences_cross_entropy
 # from k_core_summary import score_sentences_k_core
 # from globals import ROOT as ROOT
@@ -158,6 +158,7 @@ def __init__():
 
     return logger
 
+
 if __name__ == '__main__':
     logger = __init__()
     logger.info('Nb thread : ' + str(THREAD))
@@ -189,14 +190,14 @@ if __name__ == '__main__':
 
         with open(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold), c_id + "-A.sum"), 'w') as f:
-            summ = '' 
+            summ = ''
             for sent in summary_A:
                 f.write(str(sent) + '\n')
                 summ += str(sent) + '\n'
             logger.info(summ)
         with open(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold), c_id + "-B.sum"), 'w') as f:
-            summ = '' 
+            summ = ''
             for sent in summary_B:
                 f.write(str(sent) + '\n')
                 summ += str(sent) + '\n'

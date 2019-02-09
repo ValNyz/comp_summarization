@@ -6,7 +6,6 @@ load documents which are define in the file topics_{task.name}
 __author__ : valentin nyzam
 """
 
-import sys
 import os
 
 import preprocess.text as text
@@ -83,15 +82,15 @@ class SummaryProblem:
         sent_fh = open(os.path.join(path, self.id + "-A" + sent_file), 'w',
                        encoding=encoding)
         tok_fh = open(os.path.join(path, self.id + "-A" + tok_file), 'w',
-                       encoding=encoding)
+                      encoding=encoding)
         lemm_fh = open(os.path.join(path, self.id + "-A" + lemm_file), 'w',
                        encoding=encoding)
         # lemm_pos_fh = open(os.path.join(path, self.id + "-A" + lemm_pos_file), 'w',
                        # encoding=encoding)
         doc_fh = open(os.path.join(path, self.id + "-A" + doc_file), 'w',
-                       encoding=encoding)
+                      encoding=encoding)
         par_fh = open(os.path.join(path, self.id + "-A" + par_file), 'w',
-                       encoding=encoding)
+                      encoding=encoding)
         for doc in self.docs_a:
             # count = 0
             for sent in doc.sentences:
@@ -114,15 +113,15 @@ class SummaryProblem:
         sent_fh = open(os.path.join(path, self.id + "-B" + sent_file), 'w',
                        encoding=encoding)
         tok_fh = open(os.path.join(path, self.id + "-B" + tok_file), 'w',
-                       encoding=encoding)
+                      encoding=encoding)
         lemm_fh = open(os.path.join(path, self.id + "-B" + lemm_file), 'w',
                        encoding=encoding)
         # lemm_pos_fh = open(os.path.join(path, self.id + "-B" + lemm_pos_file), 'w',
                        # encoding=encoding)
         doc_fh = open(os.path.join(path, self.id + "-B" + doc_file), 'w',
-                       encoding=encoding)
+                      encoding=encoding)
         par_fh = open(os.path.join(path, self.id + "-B" + par_file), 'w',
-                       encoding=encoding)
+                      encoding=encoding)
         for doc in self.docs_b:
             # count = 0
             for sent in doc.sentences:
@@ -170,7 +169,7 @@ def setup_task(task):
     all_docs = {}
     logger.debug(task.doc_path)
     files = util.get_files(task.doc_path,
-                                    r'[^_]+_?[^_]*_?\d+[\.\-]\d+')
+                           r'[^_]+_?[^_]*_?\d+[\.\-]\d+')
     logger.debug(files)
     logger.info('Loading [%d] files\n' % len(files))
     for file in files:
@@ -224,7 +223,7 @@ def setup_sentences(task, parser=None, reload=False, options=None):
     # load problems quickly from pickle file
     if (not reload) and os.path.isfile(task.data_pickle):
         logger.info('Loading [%s] problem data from [%s]\n'
-                         % (task.name, task.data_pickle))
+                    % (task.name, task.data_pickle))
         task.problems = util.load_pickle(task.data_pickle)
         return
 
@@ -246,5 +245,5 @@ def setup_sentences(task, parser=None, reload=False, options=None):
 
     # save pickled version for faster loading later
     logger.info('Saving [%s] problem data in [%s]\n'
-                     % (task.name, task.data_pickle))
+                % (task.name, task.data_pickle))
     util.save_pickle(task.problems, task.data_pickle)

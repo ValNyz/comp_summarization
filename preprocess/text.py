@@ -20,12 +20,13 @@ from nltk import SnowballStemmer
 from nltk.tokenize.toktok import ToktokTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
+from nltk.corpus import stopwords
 # from nltk.tokenize.moses import MosesTokenizer
 # from nltk.corpus import stopwords
 # from treetagger.treetagger import TreeTagger
 
 import preprocess.util as util
-from globals import STOPWORDS
+# from globals import STOPWORDS
 
 
 class TextProcessor:
@@ -35,7 +36,7 @@ class TextProcessor:
         # self._tok = MosesTokenizer(lang='en')
         self._stemmer = SnowballStemmer('english')
         self._lemmatizer = WordNetLemmatizer() # TreeTagger(language='english')
-        self._stopwords = set(open(STOPWORDS).read().splitlines())
+        self._stopwords = set(stopwords.words('english'))  # set(open(STOPWORDS).read().splitlines())
         # istopwords.words('french') #
         self._porter_stemmer = nltk.stem.porter.PorterStemmer()
         # self._sent_tokenizer = util.load_pickle('%s%s'
@@ -98,7 +99,7 @@ class TextProcessor:
 
     def lemm_sent(self, sen_pos):
         if self._lemmatizer is None:
-            return sent
+            return self.sent
         else:
             lemm_sent = []
             for tup in sen_pos:
@@ -371,3 +372,11 @@ def get_wordnet_pos(tag):
         return wordnet.ADV
     else:
         return wordnet.NOUN
+
+
+def clean_text(sents):
+    l_sents = []
+    for sent in sents:
+        sent = text_processor.remove_punct_sent([word.lower() for word in text_processor.tokenize(sent)])
+        l_sents.append(sent)
+    return l_sents
