@@ -8,14 +8,15 @@ Inspired by :
 __author__ : Valentin Nyzam
 """
 
-from model import comp_model
-from globals import WE_MODEL
+# from model import comp_model
+# from globals import WE_MODEL
 from random import shuffle
 
 import time
 
 import logging
 logger = logging.getLogger(__name__)
+
 
 def score_sentence_knapsack2(model, lambd, *l_sents):
     d_sen_score = model.d_sen_score
@@ -26,16 +27,19 @@ def score_sentence_knapsack2(model, lambd, *l_sents):
     d_sen_sim = model.d_sen_sim
     d_id_sen = model.d_id_sents_corpus
 
-    id_summary = bi_knapsack(100, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, l_sents)
+    id_summary = bi_knapsack(100, lambd, d_id_sen, tf_docs, idf, max_score,
+                             min_score, d_sen_score, d_sen_sim, l_sents)
 
     summary_A = [l_sents[0][i[1]] for i in id_summary if i[0] == 0]
     summary_B = [l_sents[1][i[1]] for i in id_summary if i[0] == 1]
 
     return summary_A, summary_B
 
+
 # A Dynamic Programming based Python Program for 0-1 Knapsack problem
 # Returns the maximum value that can be put in a knapsack of capacity W
-def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, l_sents):
+def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score,
+                d_sen_score, d_sen_sim, l_sents):
     """knapsack
 
     """
@@ -53,8 +57,8 @@ def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_
           for w1 in range(sumSize + 1)]
          for s in range(len(l_sen) + 1)]
 
-    s_0 = 0
-    s_1 = 0
+    # s_0 = 0
+    # s_1 = 0
 
     start = time.process_time()
     for w_0 in range(sumSize + 1):
@@ -70,7 +74,8 @@ def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_
                     current_sum.add(l_sen[i-1])
                     # current_sum = list(K[i-1][w_0-sentence.len][w_1][1])
                     # current_sum.append(l_sen[i-1])
-                    value = obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, current_sum)
+                    value = obj(lambd, d_id_sen, tf_docs, idf, max_score,
+                                min_score, d_sen_score, d_sen_sim, current_sum)
                     if value >= K[i-1][w_0][w_1][0]:
                         # print(value)
                         # print(current_sum)
@@ -83,7 +88,8 @@ def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_
                     current_sum.add(l_sen[i-1])
                     # current_sum = list(K[i-1][w_0][w_1-sentence.len][1])
                     # current_sum.append(l_sen[i-1])
-                    value = obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, current_sum)
+                    value = obj(lambd, d_id_sen, tf_docs, idf, max_score,
+                                min_score, d_sen_score, d_sen_sim, current_sum)
                     if value >= K[i-1][w_0][w_1][0]:
                         # print(value)
                         # print(current_sum)
@@ -96,18 +102,22 @@ def bi_knapsack(sumSize, lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_
                 # print(K[i][w_0][w_1])
         logger.info("Iteration " + str(w_0) + " : " +
                     str(K[len(K)-1][w_0][sumSize][0]))
-    logger.info('Knapsack execution time : ' + str(time.process_time() - start))
+    logger.info('Knapsack execution time: ' + str(time.process_time() - start))
     # print(K[len(l_sen)-1])
     return K[len(K)-1][sumSize][sumSize][1]
 
-def obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_sim, summary):
+
+def obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score,
+        d_sen_sim, summary):
     ls_1 = []
     ls_2 = []
     rep = 0
+    nb_word = 0
     set_word = set()
     for sen in summary:
         temp = 0
         for word in sen[2]:
+            nb_word += 1
             if word not in set_word:
                 temp += tf_docs[sen[2].doc][word] * idf[word]
                 set_word.add(word)
@@ -119,6 +129,7 @@ def obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_
             ls_2.append(d_id_sen[(sen[0], sen[1])])
             # ls_2.append(sen)
 
+    rep /= nb_word
     # t_rep = True
     comp = 0
     # rep = 0
@@ -127,7 +138,7 @@ def obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_
         for s2 in ls_2:
             comp += d_sen_sim[(s1, s2)]
             # if t_rep:
-                # rep += d_sen_score[s2]
+            # rep += d_sen_score[s2]
         # if t_rep:
             # t_rep = False
 
@@ -139,15 +150,16 @@ def obj(lambd, d_id_sen, tf_docs, idf, max_score, min_score, d_sen_score, d_sen_
         # nb_token += len(sent)
         # for token in sent:
             # if token not in common_token:
-                # common_token.add(token)
+            # common_token.add(token)
             # else:
-                # nb_common_token += 1
+            # nb_common_token += 1
 
     # red = nb_common_token/nb_token
-    score = lambd*comp + (1-lambd)*rep
     nb_sen = len(ls_1) + len(ls_2)
+    comp /= nb_sen
+    score = lambd*comp + (1-lambd)*rep
     # red = 0
     # if (red > score):
-    return score / nb_sen
+    return score
     # else:
-        # return (score - red)/nb_sen
+    # return (score - red)/nb_sen
