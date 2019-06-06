@@ -13,25 +13,26 @@ import os
 # import threading
 from multiprocessing import Process, Queue, JoinableQueue
 import queue
-from nltk.corpus import reuters
 import math
 import gensim.models
 from itertools import product
 from collections import Counter
 from nltk.util import ngrams
-from nltk.corpus import wordnet as wn
 from scipy.spatial.distance import cosine
 from scipy.spatial.distance import euclidean
-from model.wmd import gensim_wmd
-# from model.wmd import word_mover_distance
+from model.wmd import wmd
+from .multiling import multiling_we_model
 from globals import THREAD
+import browse_corpus
 
 import logging
 logger = logging.getLogger(__name__)
 
 class Comp_model(object):
-    def __init__(self, l_sents, threshold=0.7):
+    def __init__(self, l_sents, dictionary, tfidf_model, threshold=0.7):
         self.l_sents = l_sents
+        self.dictionary = dictionary
+        self.tfidf_model = tfidf_model
         self.threshold = threshold
         self.save_name = None
         self.typ = 'word'
@@ -53,12 +54,12 @@ class Comp_model(object):
         logger.info("Nb concept in doc 0 : " + str(len(self.c_ij[0])))
         logger.info("Nb concept in doc 1 : " + str(len(self.c_ij[1])))
 
-        if os.path.exists(self.save_name + '.model'):
-            self.u_jk = self._read_concept_pair(self.save_name + '.model')
+        if os.path.exists(self.save_name):
+            self.u_jk = self._read_concept_pair(self.save_name)
         else:
             self._make_concept_pair()
             logger.info('Write concept pair similarity in ' + self.save_name)
-            with open(self.save_name + '.model', 'w', encoding='utf-8') as f:
+            with open(self.save_name, 'w', encoding='utf-8') as f:
                 for tup in self.s_jk.keys():
                     j = tup[0]
                     k = tup[1]
@@ -86,7 +87,8 @@ class Comp_model(object):
                 if self.typ == 'pos':
                     sent = sentence.get_list_word_pos()
                 else:
-                    sent = sentence.get_list_lemm_no_stop()
+                    sent = sentence.get_list_word()
+                    # sent = sentence.get_list_lemm_no_stop()
                 temp = []
                 if order > 1:
                     temp.extend(list(ngrams(sent, order)))
@@ -142,7 +144,7 @@ class Comp_model(object):
         # pair_word = manager.dict()
 
         threads = []
-        for i in range(THREAD):
+        for _ in range(int(THREAD/2)):
             t = Process(target=self.eval,
                         args=(self.model, self.w_ij, q, done_q,
                               self.sim, self.threshold))
@@ -198,12 +200,19 @@ class Comp_model(object):
 
 
 class Comp_wordnet(Comp_model):
-    def __init__(self, l_sents, threshold=None):
+    def __init__(self, l_sents, dictionary, tfidf_model, threshold=None):
+        try:
+            from nltk.corpus import wordnet as wn
+        except ImportError:
+            raise Exception("WordNet or nltk package not installed. Please \
+                            install it.")
+
         if threshold is None:
             Comp_model.__init__(self, l_sents)
         else:
-            Comp_model.__init__(self, l_sents, threshold)
-        self.save_name = 'pair_wordnet_' + l_sents[0][0].corpus[:-2]
+            Comp_model.__init__(self, l_sents, dictionary, tfidf_model, threshold)
+        self.save_name = os.path.join('generated_models', 'pair_wordnet_' +
+                                      l_sents[0][0].corpus[:-2] + '.model')
         self.eval = _evaluate_pair_word
         self.sim = _relevance_wordnet
         self.model = None
@@ -227,43 +236,91 @@ def _relevance_wordnet(model, w_0, w_1):
 
 
 class Comp_we(Comp_model):
-    def __init__(self, model_name, l_sents, threshold=None):
-        if threshold is None:
-            Comp_model.__init__(self, l_sents)
+    def __init__(self, models_path, models_convention_name, l_sents, dictionary, tfidf_model, threshold=None):
+        Comp_model.__init__(self, l_sents, dictionary, tfidf_model, threshold)
+        self.models_path = models_path
+        self.models_convetion_name = models_convetion_name
+
+    def prepare(self):
+        if not os.path.exists(self.save_name):
+            self._load_model()
+        super(Comp_model).prepare()
+
+
+    def _load_model(self):
+        """
+        Load word embeddings model
+        Models may need to have been updated using update_model.py for unseen word
+        """
+        sents = []
+        for doc in self.l_sents:
+            sents.extend(doc)
+
+        if os.path.exists(self.models_path):
+            self.model = multiling_we_model.MultilingModels(self.models_path,
+                                                            self.models_convention_name,
+                                                            sents)
         else:
-            Comp_model.__init__(self, l_sents, threshold)
+            raise Exception('Models folder %s not found.' % self.models_path)
+
+        # logger.info("Normalizing word2vec vectors...")
+        # self.model.init_sims(replace=True)
+        logging.getLogger('gensim.models.base_any2vec').setLevel(logging.WARNING)
+        logging.getLogger('gensim.models.keyedvectors').setLevel(logging.WARNING)
+        logging.getLogger('gensim.corpora.dictionary').setLevel(logging.WARNING)
+
+
+class Comp_we_cosine(Comp_we):
+    def __init__(self, models_path, models_convention_name, l_sents, dictionary, tfidf_model, threshold=None):
+        if threshold is None:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model)
+        else:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model, threshold)
+
         self.typ = 'word'
-        self.save_name = 'pair_' + l_sents[0][0].corpus[:-2]
+        self.save_name = os.path.join('generated_models', 'pair_' +
+                                      l_sents[0][0].corpus[:-2] + '.model')
         self.eval = _evaluate_pair_word
         self.sim = cosine_similarity
 
-        if not os.path.exists(self.save_name + '.model'):
-            self._update_model(model_name)
 
-    def _update_model(self, model_name):
-        """_update_model
-        update word embeddings model on self.l_sents for unseen word
-        """
-        sents = []
-        for ss in self.l_sents:
-            sents.extend(ss)
-        if os.path.exists(model_name):
-            self.model = gensim.models.Word2Vec.load(model_name)
-            self.model.min_count = 0
-            self.model.build_vocab(sents, update=True)
-            self.model.train(sents, total_examples=len(sents),
-                             epochs=self.model.epochs)
+class Comp_we_min_cosinus(Comp_we):
+    def __init__(self, models_path, models_convention_name, l_sents, dictionary, tfidf_model, threshold=None):
+        if threshold is None:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model)
         else:
-            self.model = gensim.models.Word2Vec(sents,
-                                   size=300,
-                                   window=10,
-                                   min_count=0,
-                                   workers=THREAD)
-            self.model.train(sents, total_examples=len(sents), epochs=10)
-        logger.info("Normalizing word2vec vectors...")
-        self.model.init_sims(replace=True)
-        logging.getLogger('gensim.corpora.dictionary').setLevel(logging.WARNING)
-        logging.getLogger('gensim.models.keyedvectors').setLevel(logging.WARNING)
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model, threshold)
+        self.save_name = os.path.join('generated_models', 'pair_we_min_cosinus_' +
+                                      l_sents[0][0].corpus[:-2] + '.model')
+
+        self.eval = _evaluate_pair_concept
+        self.sim = min_cosine_similarity
+
+
+class Comp_we_min_euclidean(Comp_we):
+    def __init__(self, models_path, models_convention_name, l_sents, dictionary, tfidf_model, threshold=None):
+        if threshold is None:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model)
+        else:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model, threshold)
+        self.save_name = os.path.join('generated_models', 'pair_we_min_euclidean_' +
+                                      l_sents[0][0].corpus[:-2] + '.model')
+
+        self.eval = _evaluate_pair_concept
+        self.sim = min_euclidean_similarity
+
+
+class Comp_we_wmd(Comp_we):
+    def __init__(self, models_path, models_convention_name, l_sents, dictionary, tfidf_model, threshold=None):
+        if threshold is None:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model)
+        else:
+            Comp_we.__init__(self, l_sents, dictionary, tfidf_model, threshold)
+        self.save_name = os.path.join('generated_models', 'pair_we_wmd_' +
+                                      l_sents[0][0].corpus[:-2] + '.model')
+
+        self.eval = _evaluate_pair_concept
+        self.sim = wmd
 
 
 def _print_progress(q, done_q):
@@ -331,264 +388,35 @@ def _evaluate_pair_concept(model, w_ij, q, done_q, similarity, threshold):
             sleep(0.001)
             pass
 
-class Comp_we_min_cosinus(Comp_we):
-    def __init__(self, model_name, l_sents, threshold=None):
-        if threshold is None:
-            Comp_model.__init__(self, l_sents)
-        else:
-            Comp_model.__init__(self, l_sents, threshold)
-        self.save_name = 'pair_we_min_cosinus_' + l_sents[0][0].corpus[:-2]
-        self.eval = _evaluate_pair_concept
-        self.sim = min_cosine_similarity
-        # self.sim = word_mover_distance
-        self._update_model(model_name)
-
-class Comp_we_min_euclidean(Comp_we):
-    def __init__(self, model_name, l_sents, threshold=None):
-        if threshold is None:
-            Comp_model.__init__(self, l_sents)
-        else:
-            Comp_model.__init__(self, l_sents, threshold)
-        self.save_name = 'pair_we_min_euclidean_' + l_sents[0][0].corpus[:-2]
-        self.eval = _evaluate_pair_concept
-        self.sim = min_euclidean_similarity
-        # self.sim = word_mover_distance
-        self._update_model(model_name)
-
-
-class Comp_we_wmd(Comp_we):
-    def __init__(self, model_name, l_sents, threshold=None):
-        if threshold is None:
-            Comp_model.__init__(self, l_sents)
-        else:
-            Comp_model.__init__(self, l_sents, threshold)
-        self.save_name = 'pair_we_wmd_' + l_sents[0][0].corpus[:-2]
-        self.eval = _evaluate_pair_concept
-        self.sim = gensim_wmd
-        self._update_model(model_name)
-
-
-class Comp_cluster(Comp_we):
-    def __init__(self, model_name, l_sents, k, threshold=None):
-        if threshold is None:
-            Comp_we.__init__(self, model_name, l_sents)
-        else:
-            Comp_we.__init__(self, model_name, l_sents, threshold)
-        self.save_name = 'pair_cluster_' + l_sents[0][0].corpus[:-2]
-        self.sents = []
-        for sentence in l_sents:
-            self.sents.append(sentence.get_list_word())
-        self.k = k
-
-    def prepare(self):
-        Comp_model.prepare(self)
-        if os.path.exists(self.save_name  + '.model'):
-            self.u_jk = self._read_concept_pair(self.save_name +
-                                                '.model')
-
-        else:
-            from kmeans import kmeans
-
-            self._clusters = kmeans(self.sents, self.k, 0.001, self.model)
-            self._make_concept_pair()
-            with open(self.save_name + '.model', 'w') as f:
-                for tup in self.u_jk.keys():
-                    j = tup[0]
-                    k = tup[1]
-                    f.write(' '.join(self.c_ij[0][j]) + '\t' +
-                            ' '.join(self.c_ij[1][k]) + '\t' +
-                            str(self.u_jk[tup]) + '\n')
-
-    def _make_concept_pair(self):
-        q = JoinableQueue()
-        done_q = Queue()
-
-        threads = []
-        for i in range(THREAD):
-            t = Process(target=_evaluate_pair_word,
-                        args=(self.model, self.w_ij, q, done_q, self.sim,
-                              self.threshold))
-            t.start()
-            threads.append(t)
-
-        t = Process(target=_print_progress, args=(q, ))
-        t.start()
-        threads.append(t)
-
-        for cluster in self._clusters:
-            lc_0 = set()
-            lc_1 = set()
-            for sen in cluster:
-                tup = self.d_sentence(id(sen))
-                if tup[0] == 0:
-                    lc_0.update(self.s_ik[tup[0]][tup[1]])
-                else:
-                    lc_1.update(self.s_ik[tup[0]][tup[1]])
-            for c_0 in lc_0:
-                for c_1 in lc_1:
-                    tup = (
-                        (self.d_concept[c_0][1], c_0),
-                        (self.d_concept[c_1][1], c_1)
-                    )
-                    q.put(tup)
-
-        logger.info('Queuing complete')
-        while not q.empty() or not done_q.empty():
-            try:
-                tup = done_q.get()
-                j = tup[0][0]
-                k = tup[0][1]
-                self.u_jk[(j, k)] = tup[1]
-            except queue.Empty:
-                pass
-        # block until all tasks are done
-        q.join()
-        # stop workers
-        for t in threads:
-            t.terminate()
-
-        print('Nb pair : ' + str(len(self.u_jk)))
-
-
-class Comp_sentence_model(Comp_we):
-    def __init__(self, model_name, l_sents, threshold=None):
-        if threshold is None:
-            Comp_model.__init__(self, l_sents)
-        else:
-            Comp_model.__init__(self, l_sents, threshold)
-
-        self.save_name = 'pair_sentence_' + l_sents[0][0].corpus[:-2]
-        self.eval = _evaluate_pair_concept
-        self.sim = gensim_wmd
-        self.model = None
-        self._update_model(model_name)
-
-    def _make_concept_pair(self):
-        """make_concept_pair
-        :param c_ij:
-        :param w_ij:
-        :param similarity: similarity function: input(sentence, sentence):
-            ouput(0<int<1)
-        :return list[np.array]: size [j, k]
-        """
-        q = JoinableQueue()
-        done_q = Queue()
-
-        threads = []
-        for i in range(THREAD):
-            t = Process(target=_evaluate_pair_sentence,
-                        args=(self.model, self.d_concept, self.s_ik, self.w_ij, q, done_q,
-                              self.threshold))
-            t.start()
-            threads.append(t)
-
-        t = Process(target=_print_progress, args=(q, done_q))
-        t.start()
-        threads.append(t)
-
-        size_sen = len(self.l_sents[0]) * len(self.l_sents[1])
-        size = len(self.c_ij[0]) * len(self.c_ij[1])
-        logger.info(str(size_sen) + ' sentence pairs to test')
-        # for j in range(len(self.l_sents[0])):
-            # s_0 = self.l_sents[0][j]
-        for j, s_0 in enumerate(self.l_sents[0]):
-            # for k in range(len(self.l_sents[1])):
-                # s_1 = self.l_sents[1][k]
-            for k, s_1 in enumerate(self.l_sents[1]):
-                tup = (
-                    (j, s_0),
-                    (k, s_1)
-                )
-                q.put(tup)
-        logger.info('Queuing complete')
-
-        # block until all pair are processed.
-        # q.join()
-        sleep(0.2)
-
-        counter_dq = 0
-        while not (q.empty() and done_q.empty()):
-            try:
-                tup = done_q.get()
-                j = tup[0][0]
-                k = tup[0][1]
-
-                self.u_jk[(j, k)] = tup[1]
-                if (j, k) not in self.s_jk:
-                    self.s_jk[(j, k)] = [tup[2]]
-                else:
-                    self.s_jk[(j, k)].append(tup[2])
-
-                counter_dq += 1
-                # if counter_dq % 1000 == 0:
-                    # logger.info(str(counter_dq) + " pair already processed.")
-                # done_q.task_done()
-            except queue.Empty:
-                logger.info("Done_q is empty")
-                sleep(0.1)
-        logger.info("Processing complete")
-
-        # stop workers
-        for t in threads:
-            t.terminate()
-
-        for key in self.s_jk.keys():
-            self.s_jk[key] = sum(self.s_jk[key])/len(self.s_jk[key])
-
-        # done_q.join()
-
-        logger.info('Verify nb pair : ')
-        logger.info('Nb pair : ' + str(counter_dq))
-        logger.info('Nb pair : ' + str(len(self.u_jk)))
-
-
-def _evaluate_pair_sentence(model, d_concept, s_ik, w_ij, q, done_q, threshold):
-    """
-    item = ((j, s_0), (k, s_1))
-    """
-    while True:
-        try:
-            item = q.get()
-            s_0 = item[0][1]
-            s_1 = item[1][1]
-            j = item[0][0]
-            k = item[1][0]
-
-            dis = gensim_wmd(model, s_0.tok, s_1.tok)
-            # dis = word_mover_distance(model, s_0.tok, s_1.tok)
-            sim = 1./(1. + dis)
-            logger.debug("_evaluate_pair_sentence : " + str(sim))
-            if sim > threshold:
-                for c_0 in s_ik[0][j]:
-                    j_c = d_concept[c_0][0]
-                    for c_1 in s_ik[1][k]:
-                        k_c = d_concept[c_1][1]
-                        done_q.put(((j_c, k_c), (w_ij[0][c_0]+w_ij[1][c_1])/2, sim))
-            q.task_done()
-        except queue.Empty:
-            sleep(0.001)
-            pass
-
 
 def l_sent_to_str(l_sents):
     return [sent.get_list_word() for sent in l_sents]
 
 
-def cosine_similarity(model, w1, w2):
-    return 1-cosine(model[w1], model[w2])
+def cosine_similarity(model, word1, word2):
+    model1 = model[word1.language]
+    model2 = model[word2.language]
+    return 1-cosine(model1[word1], model2[word2])
 
 def min_cosine_similarity(model, c1, c2):
     value = []
     for w1 in c1:
         for w2 in c2:
-            value.append(1-cosine(model[w1], model[w2]))
+            value.append(cosine_similarity(model, w1, w2))
     return min(value)
+
+
+def euclidean_similarity(model, word1, word2):
+    model1 = model[word1.language]
+    model2 = model[word2.language]
+    return 1/(1+euclidean(model1[word1], model2[word2]))
+
 
 def min_euclidean_similarity(model, c1, c2):
     value = []
     for w1 in c1:
         for w2 in c2:
-            value.append(1/(1+euclidean(model[w1], model[w2])))
+            value.append(euclidean_similarity(model, w1, w2))
     return min(value)
 
 
@@ -606,9 +434,9 @@ def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
     for doc in docs:
         set_doc_concept = set()
         for sent in doc:
-            if order > 1:
-                set_doc_concept.update(ngrams(sent, order))
-            set_doc_concept.update(ngrams(sent, 1))
+            # if order > 1:
+            set_doc_concept.update(ngrams(sent, order))
+            # set_doc_concept.update(ngrams(sent, 1))
             for w in sent:
                 set_doc_concept.add(w)
         for concept in set_doc_concept:
@@ -625,11 +453,17 @@ def make_concept_idf_dict(docs, dict_idf={}, nb=0, order=2):
 def reuters_idf_dict(current_docs, file_name, order=2):
     """
     """
+    try:
+        from nltk.corpus import reuters
+    except ImportError:
+        raise Exception("Reuters or nltk package not installed. Please \
+                        install it.")
     idf_file = file_name + '_' + str(order) + ".idf"
     dict_idf = {}
-    if os.path.exists(idf_file):
-        l_docs = list_sen_corpus_to_list_sen_doc(current_docs)
-        with open(idf_file, 'r', encoding='utf-8') as f:
+    if os.path.exists(os.path.join('generated_models', idf_file)):
+        l_docs = browse_corpus.list_corpus_2_list_doc(current_docs)
+        with open(os.path.join('generated_models', idf_file), 'r',
+                  encoding='utf-8') as f:
             for line in f:
                 values = line.split("\t")
                 # print(values)
@@ -646,30 +480,15 @@ def reuters_idf_dict(current_docs, file_name, order=2):
         for fileid in reuters.fileids():
             l_docs.append(reuters.sents(fileids=[fileid]))
         dict_idf = make_concept_idf_dict(l_docs, order=order)
-        with open(idf_file, 'w', encoding='utf-8') as f:
+        with open(os.path.join('generated_models', idf_file), 'w',
+                  encoding='utf-8') as f:
             for concept in dict_idf.keys():
                 if isinstance(concept, tuple):
-                    f.write(' '.join([c for c in concept if c is not None]) + '\t' + str(dict_idf[concept]) +
-                        '\n')
+                    f.write(' '.join([c for c in concept if c is not None]) +
+                            '\t' + str(dict_idf[concept]) + '\n')
                 else:
                     f.write(concept + '\t' + str(dict_idf[concept]) + '\n')
         l_docs = list_sen_corpus_to_list_sen_doc(current_docs, l_docs)
         dict_idf = make_concept_idf_dict(l_docs, dict_idf,
                                          len(reuters.fileids()))
         return dict_idf
-
-
-def list_sen_corpus_to_list_sen_doc(current_docs, l_docs=[]):
-    doc = []
-    for corpus in current_docs:
-        prev_doc = corpus[0].doc
-        for sent in corpus:
-            doc.append(sent)
-            if sent.doc != prev_doc:
-                l_docs.append(doc)
-                doc = []
-            prev_doc = sent.doc
-        l_docs.append(doc)
-        doc = []
-    return l_docs
-

@@ -1,4 +1,4 @@
-def run_script(script, stdin=None):   
+def run_script(script, stdin=None):
     """Returns (stdout, stderr), raises error on non-zero return code"""
     import subprocess
     # Note: by using a list here (['bash', ...]) you avoid quoting issues, as the
@@ -17,4 +17,4 @@ class ScriptException(Exception):
     def __init__(self, returncode, stdout, stderr):
         self.returncode = returncode
         self.stdout = stdout
-        self.stderr =  stderr
+        self.stderr = stderr

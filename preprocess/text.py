@@ -131,9 +131,10 @@ class Sentence:
     self.parsed       s-exp representation of a parse tree
     """
 
-    def __init__(self, text, order=0, source="?", date="?"):
+    def __init__(self, text, order=0, source="?", date="?", language='?'):
         self.order = order
         self.date = date
+        self.language = language
         self.source = source
         self.set_text(text)
 
@@ -179,6 +180,7 @@ class Document:
     self.id             'XIE19980304.0061'
     self.source         'XIE'
     self.date           '19980304.0061'
+    self.language       'en'
     self.paragraphs     ['Par 1 text', 'Par 2 text', ... ]
     self.sentences      ['sent 1 text', 'sent 2 text', ... ]
     """
@@ -302,6 +304,7 @@ class Document:
         self.id = 'NONE'
         self.date = 'NONE'
         self.source = 'NONE'
+        self.language = 'NONE'
         self.paragraphs = []
         self._isempty = True
 
@@ -329,6 +332,12 @@ class Document:
         if self.id != 'NONE':
             self.source = re.findall('^[^_\d]*', self.id)[0]
             self.date = self.id.replace(self.source, '')
+            match = re.search('<LANG>\n(.*)\n</LANG>', rawdata[:500])
+            if match:
+                self.language = str(match.groups(1)[0])
+            else:
+                sys.stderr.write('ERROR: no <LANG> tag: %s\n'
+                                 % path)
 
         # parse various types of newswire xml
         if is_clean:
@@ -354,6 +363,7 @@ class Document:
         s.append('%s DOCUMENT' % '#START')
         s.append('ID %s' % self.id)
         s.append('SOURCE %s' % self.source)
+        s.append('LANGUAGE %s' % self.language)
         s.append('DATE %s' % self.date)
         s.append('TEXT')
         s.extend(self.paragraphs)

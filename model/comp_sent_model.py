@@ -5,38 +5,48 @@ Comparative summarization model using sentence to sentence similarity
 
 __author__ : Valentin Nyzam
 """
-from collections import Counter
-
-from browse_corpus import build_dicts
-from model.comp_model import reuters_idf_dict
-from model.comp_model import list_sen_corpus_to_list_sen_doc
-# from model.lexrank_wmd import LexRank_wmd
-from lexrank import LexRank
-
-from model.wmd import gensim_wmd
-from model.wmd import word_mover_distance
-
-import gensim
 import os
 from time import sleep
 import sys
-
+from collections import Counter
 from multiprocessing import Process, Queue, JoinableQueue
 from globals import THREAD
+
+from lexrank import LexRank
+# from model.lexrank_wmd import LexRank_wmd
+
+# from browse_corpus import build_dicts
+
+from model.wmd import wmd
+
+from .multiling import multiling_we_model
 
 import logging
 logger = logging.getLogger(__name__)
 
 
 class Comp_sent_model(object):
-    def __init__(self, model_name, l_sents, lambd=0.55, lexrank=False):
-        self.model_name = model_name
+    def __init__(self, models_path, models_convention_name, l_sents,
+                 dictionary, tfidf_model, lambd=0.55,
+                 lexrank=False, update=False):
+        self.models_path = models_path
+        self.models_convention_name = models_convention_name
         self.l_sents = l_sents
         self.lambd = lambd
-        self.save_name = 'pair_sentence_wmd_' + l_sents[0][0].corpus[:-2]
+        self.save_name = os.path.join('generated_models', 'pair_sentence_wmd_'
+                                      + l_sents[0][0].corpus[:-2] + '.model')
         self.typ = 'sent'
+
+        self.dictionary = dictionary
+        self.tfidf_model = tfidf_model
+
         self.d_sen_sim = {}
         self.lexrank = lexrank
+        self.update = update
+
+        if not os.path.exists(self.save_name):
+            self._load_model()
+
 
     def prepare(self):
         self.d_id_sents = []
@@ -45,19 +55,15 @@ class Comp_sent_model(object):
             for j in range(len(self.l_sents[i])):
                 self.d_id_sents_corpus[(i, j)] = len(self.d_id_sents)
                 self.d_id_sents.append((i, j))
-        self.docs = list_sen_corpus_to_list_sen_doc(self.l_sents)
-
-        # self.d_id_word, self.d_word_id = build_dicts(self.l_sents)
 
         print("Nb sentence : " + str(len(self.d_id_sents)))
 
-        if os.path.exists(self.save_name + '.model'):
-            self._read_sentence_pair(self.save_name + '.model')
+        if os.path.exists(self.save_name):
+            self._read_sentence_pair(self.save_name)
         else:
-            self._update_model(self.model_name)
             self._make_sentence_pair()
             logger.info('Write sentence pair similarity in ' + self.save_name)
-            with open(self.save_name + '.model', 'w', encoding='utf-8') as f:
+            with open(self.save_name, 'w', encoding='utf-8') as f:
                 for item, value in self.d_sen_sim.items():
                     f.write(str(item[0]) + '\t' + str(item[1]) + '\t' +
                             str(value) + '\n')
@@ -68,7 +74,20 @@ class Comp_sent_model(object):
             # lxr = LexRank_wmd()
             # self.d_sen_score = lxr.rank_sentences(len(self.d_id_sents), self.d_sen_sim)
         else:
-            self.d_sen_score, self.tf_docs, self.idf = self.computeTfIdf()
+            self.d_sen_score = []
+            self.d_word_tfidf = []
+            for corpus in self.l_sents:
+                word_tf_idf = dict(self.tfidf_model[self.dictionary.doc2bow([word for sen in corpus
+                                                                             for word in sen])])
+                self.d_word_tfidf.append(word_tf_idf)
+                for sen in corpus:
+                    score = 0
+                    for word in sen:
+                        try:
+                            score += word_tf_idf[self.dictionary.token2id[word]]
+                        except:
+                            pass
+                    self.d_sen_score.append(score)
         self.max_score = max(self.d_sen_score)
         self.min_score = min(self.d_sen_score)
         diff = self.max_score - self.min_score
@@ -76,49 +95,27 @@ class Comp_sent_model(object):
             self.d_sen_score[i] = (self.d_sen_score[i] - self.min_score) / diff
 
 
-    def computeTfIdf(self):
-        idf = reuters_idf_dict(self.l_sents, 'reuters', 1)
-        d_sen_score = []
-        tf_docs = {}
-        for doc in self.docs:
-            words = [word for sent in doc for word in sent]
-            tf = Counter(words)
-            for sent in doc:
-                if sent.doc not in tf_docs:
-                    tf_docs[sent.doc] = tf
-                score = 0
-                for word in sent:
-                    score += tf[word]*idf[word]
-                d_sen_score.append(score)
-        return d_sen_score, tf_docs, idf
-
-    def _update_model(self, model_name):
-        """_update_model
-        update word embeddings model on self.l_sents for unseen word
+    def _load_model(self):
+        """
+        Load word embeddings model
+        Models may need to have been updated using update_model.py for unseen word
         """
         sents = []
         for doc in self.l_sents:
             sents.extend(doc)
-        if os.path.exists(model_name):
-            self.model = gensim.models.Word2Vec.load(model_name)
-            self.model.min_count = 0
-            self.model.build_vocab(sents, update=True)
-            self.model.train(sents, total_examples=len(sents),
-                             epochs=self.model.epochs)
+        if os.path.exists(self.models_path):
+            self.model = multiling_we_model.MultilingModels(self.models_path,
+                                                            self.models_convention_name,
+                                                            sents)
         else:
-            self.model = gensim.models.Word2Vec(sents,
-                                   size=300,
-                                   window=10,
-                                   min_count=0,
-                                   workers=THREAD)
-            self.model.train(sents, total_examples=len(sents), epochs=10)
-        # logger.info("Normalizing word2vec vectors...")
-        # self.model.init_sims(replace=True)
+            raise Exception('Models folder %s not found.' % self.models_path)
+
         logging.getLogger('gensim.models.base_any2vec').setLevel(logging.WARNING)
         logging.getLogger('gensim.models.keyedvectors').setLevel(logging.WARNING)
         logging.getLogger('gensim.corpora.dictionary').setLevel(logging.WARNING)
 
     def _read_sentence_pair(self, file_name):
+        logger.info('Reading sentence pair similarity model %s' % file_name)
         with open(file_name, 'r', encoding='utf-8') as f:
             for line in f:
                 pair = line.split('\t')
@@ -214,8 +211,7 @@ def _pair_consumer(queue_in, queue_out, model, d_id_sents, l_sents):
         j = item[1]
         sent1 = l_sents[d_id_sents[i][0]][d_id_sents[i][1]]
         sent2 = l_sents[d_id_sents[j][0]][d_id_sents[j][1]]
-        sim = gensim_wmd(model, sent1, sent2)
-        # sim = word_mover_distance(model, sent1, sent2)
+        sim = wmd(model, sent1, sent2)
         queue_out.put((i, j, 1./(1.+ sim)))
         queue_in.task_done()
 

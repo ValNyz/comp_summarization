@@ -12,38 +12,41 @@ from itertools import chain
 from preprocess.text import text_processor as tp
 
 
-class Sentence:
-    def __init__(self, corpus, id, order, orig, doc, tok=None, lemm=None,
-                 parse=None, par=None, unresolved=False):
+class Token(str):
+    def __new__(cls, word, language):
+        self = super(Token, cls).__new__(cls, word)
+        self.language = language
+
+        return self
+
+class Sentence():
+    def __init__(self, corpus, idx, order, orig, doc, language=None, tok=None, lemm=None,
+                 parse=None, par=None):
         self.corpus = corpus
-        self.id = id
+        self.id = idx
         self.order = order
         self.orig = orig
+        self.doc = doc
+        self.language = language
         if tok is not None:
-            self.tok = [word for word in tp.remove_punct(tok).split()
+            self.tok = [Token(word, self.language)
+                        for word in tp.remove_punct(tok).split()
                         if len(word) > 0]
             self.tok2 = tp.remove_stopwords(self.tok)
         self.len = len(self.tok)
         if lemm is not None:
             # self.pos = pos.split()
-            self.lemm = [word for word in tp.remove_punct(lemm).split()
-                        if len(word) > 0]
+            self.lemm = [Token(word, self.language)
+                         for word in tp.remove_punct(lemm).split()
+                         if len(word) > 0]
             self.lemm2 = tp.remove_stopwords(self.lemm)
-        # self.stem = tp.stem_sent(self.tok2)
-        # self.lemm = tp.remove_stopwords([word.lower()
-        # for word in tp.lemm_sent(self.orig) if len(word) > 0])
-        # print(self.lemm)
 
-        self.doc = doc
         self.parse = parse
         self.new_par = (par == '1')
         self.length = len(self.orig.split())
-        self.depends = set()
-        self.groups = []
-        self.skip = False
-        self.skip_concepts = False
-        self.unresolved = unresolved
-        self.atleast = ""
+
+    def get_list_word(self):
+        return self.tok
 
     def __len__(self):
         return self.len
@@ -51,26 +54,8 @@ class Sentence:
     def __iter__(self):
         return iter(self.tok)
 
-    def get_list_word(self):
-        return self.tok
-
-    def get_list_word_no_stop(self):
-        return self.tok2
-
-    def get_list_lemm(self):
-        return self.lemm
-
-    def get_list_lemm_no_stop(self):
-        return self.lemm2
-
-    def get_list_word_pos(self):
-        return [(w, p) for p in self.lemm_pos for w in self.tok2]
-
     def __str__(self):
         return self.orig
-
-    def __repr__(self):
-        return self.__str__()
 
 
 def load_sents(input_path, corpus_id, encoding='utf-8'):
@@ -116,9 +101,12 @@ def load_sents(input_path, corpus_id, encoding='utf-8'):
                                          par_fh.readline()]]
         if not (doc or orig or tok or lemm or parse):
             break
+        info = doc.split()
+        doc = info[0]
+        language = info[1]
         if doc != prev_doc:
             order = 0
-        s = Sentence(corpus, count, order, orig, doc, tok, lemm, parse, par)
+        s = Sentence(corpus, count, order, orig, doc, language, tok, lemm, parse, par)
         if len(s.tok) > 8:
             sents.append(s)
             order += 1
@@ -129,28 +117,32 @@ def load_sents(input_path, corpus_id, encoding='utf-8'):
     return [sen.get_list_word() for sen in sents], sents
 
 
-def build_dicts(*l_sents):
+def list_corpus_2_list_doc(current_corpus, l_docs=[]):
     """
-    build dicts of words for the list of Sentence l_sentences
-    :param l_sentences: list: [list of Sentence]
-    :return: dict_int: dict of (int:str)
-    :return: dict_str: dict of (str:int)
-    """
-    dict_str = {}
-    dict_int = {}
-    for sen in chain(*l_sents):
-        for word in sen:
-            if word not in dict_str:
-                dict_int[len(dict_int)] = word
-                dict_str[word] = len(dict_str)
-    return dict_str, dict_int
+    Transform a list of corpus as a list of documents using browse_corpus.Sentence.doc
+    property
 
+    Parameters
+        ----------
+        current_corpus : :class: list of list of browse_corpus.Sentence
+            list of corpus (as a list of Sentence)
+        l_docs : :class: list of list of browse_corpus.Sentence
+            list of document (as a list of Sentence)
 
-def str_sent_to_int_sent(dict_str, sent):
+        Returns
+        -------
+        l_docs : :class: list of list of browse_corpus.Sentence
+            list of document (as a list of Sentence)
     """
-    transform a Sentence to a sentence of int based on dict_str
-    :param dict_str: dict: dict of (str:int): dict of words
-    :param sent: list: list of Sentence
-    :return: list: list of int
-    """
-    return [dict_str(word) for word in sent if word in dict_str]
+    doc = []
+    for corpus in current_corpus:
+        prev_doc = corpus[0].doc
+        for sent in corpus:
+            doc.append(sent)
+            if sent.doc != prev_doc:
+                l_docs.append(doc)
+                doc = []
+            prev_doc = sent.doc
+        l_docs.append(doc)
+        doc = []
+    return l_docs

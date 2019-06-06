@@ -13,83 +13,87 @@ from model import comp_model
 from model import comp_sent_model
 from globals import THREAD
 from globals import LOG_LEVEL
-from globals import WE_MODEL
-from knapsack import score_sentence_knapsack
-from sentence_knapsack import score_sentence_knapsack2
-from ilp import score_sentence_ilp
-from minimum_dominating_set import score_sentences_MDS
-# from cross_entropy_summary import score_sentences_cross_entropy
-# from k_core_summary import score_sentences_k_core
-# from globals import ROOT as ROOT
-# from globals import DATA_ROOT as DATA_ROOT
+from globals import WE_MODELS_FOLDER
+from globals import WE_MODELS_CONVENTION_NAME
+from extraction_alg import knapsack, sentence_knapsack
+from extraction_alg import ilp, sentence_ilp
+
+from gensim.corpora.dictionary import Dictionary
+from gensim.models.tfidfmodel import TfidfModel
 
 import logging
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def score_sentence_by_word(sent, dict):
-    list = [dict[word] for word in sent]
-    return 0 if len(list) == 0 else sum(list)/len(list)
-
-
 def make_comp_summary(comparative, model, threshold,
-                      data_path, corpus_id, summ_path, length):
+                      corpus_i, length, list_corpus_sen,
+                      dictionary, tfidf_model):
 
-    # load sents
-    s_A, sents_A = browse_corpus.load_sents(data_path, corpus_id + '-A')
-    s_B, sents_B = browse_corpus.load_sents(data_path, corpus_id + '-B')
+    # get sents [[SentsA], [SentsB]]
+    l_sents = list_corpus_sen[i]
+    # sents_A = list_corpus_sen[corpus_i][0]
+    # sents_B = list_corpus_sen[corpus_i][1]
 
     start = time.process_time()
-    c_model = None
-    summary_A, summary_B = None, None
-    l_sents = [sents_A, sents_B]
+
     if model == 'WordNet':
-        c_model = comp_model.Comp_wordnet(l_sents, threshold)
+        c_model = comp_model.Comp_wordnet(l_sents, dictionary,
+                                          tfidf_model, threshold)
     elif model == 'WE':
-        c_model = comp_model.Comp_we(WE_MODEL, l_sents, threshold)
+        c_model = comp_model.Comp_we_cosine(WE_MODELS_FOLDER,
+                                            WE_MODELS_CONVENTION_NAME,
+                                            l_sents, dictionary,
+                                            tfidf_model, threshold)
     elif model == 'WE_WMD':
-        c_model = comp_model.Comp_we_wmd(WE_MODEL, l_sents, threshold)
+        c_model = comp_model.Comp_we_wmd(WE_MODELS_FOLDER,
+                                         WE_MODELS_CONVENTION_NAME,
+                                         l_sents, dictionary,
+                                         tfidf_model, threshold)
     elif model == 'WE_COS':
-        c_model = comp_model.Comp_we_min_cosinus(WE_MODEL, l_sents, threshold)
+        c_model = comp_model.Comp_we_min_cosinus(WE_MODELS_FOLDER,
+                                                 WE_MODELS_CONVENTION_NAME,
+                                                 l_sents, dictionary,
+                                                 tfidf_model, threshold)
     elif model == 'WE_EUC':
-        c_model = comp_model.Comp_we_min_euclidean(WE_MODEL, l_sents, threshold)
+        c_model = comp_model.Comp_we_min_euclidean(WE_MODELS_FOLDER,
+                                                   WE_MODELS_CONVENTION_NAME,
+                                                   l_sents, dictionary,
+                                                   tfidf_model, threshold)
     elif model == 'WE_SEN_WMD':
-        c_model = comp_sent_model.Comp_sent_model(WE_MODEL, l_sents, threshold)
-    elif model == 'WE_SEN':
-        c_model = comp_model.Comp_sentence_model(WE_MODEL, l_sents, threshold)
+        c_model = comp_sent_model.Comp_sent_model(WE_MODELS_FOLDER,
+                                                  WE_MODELS_CONVENTION_NAME,
+                                                  l_sents, dictionary,
+                                                  tfidf_model,threshold)
+    else:
+        logger.warning(model + " don't exist.")
+        exit()
 
     c_model.prepare()
 
     if comparative == 'knapsack':
-        summary_A, summary_B = score_sentence_knapsack(c_model, threshold, sents_A, sents_B)
+        summary_A, summary_B = knapsack.score_sentence_knapsack(c_model,
+                                                                threshold,
+                                                                l_sents)
     elif comparative == 'ilp':
-        summary_A, summary_B = score_sentence_ilp(c_model, threshold, sents_A, sents_B)
+        summary_A, summary_B = ilp.score_sentence_ilp(c_model,
+                                                      threshold,
+                                                      l_sents)
     elif comparative == 'knapsack2':
-        summary_A, summary_B = score_sentence_knapsack2(c_model, threshold, sents_A, sents_B)
+        summary_A, summary_B = sentence_knapsack.score_sentence_knapsack2(c_model,
+                                                                          threshold,
+                                                                          l_sents)
+    elif comparative == 'ilp2':
+        summary_A, summary_B = sentence_ilp.score_sentence_ilp2(c_model,
+                                                                threshold,
+                                                                l_sents)
+    else:
+        logger.warning(model + " don't exist.")
+        exit()
 
-    # summary_A, summary_B = score_sentences_MDS(sents_A, sents_B)
-    # dict_sent_A, dict_sent_B = score_sentences_k_core(sents_A, sents_B, \
-    #       score_sentence_by_word)
-    # select_n_sentence(5, dict_sent_A, dict_sent_B, s_A, s_B)
     end = time.process_time()
     print("Time elapsed : " + str(end - start))
     return summary_A, summary_B
-
-
-def select_n_sentence(n, dict_sent_A, dict_sent_B, list_orig_sen_A,
-                      list_orig_sen_B):
-    for i, sent in enumerate(reversed(sorted(dict_sent_A,
-                                             key=dict_sent_A.get))):
-        if i == n:
-            break
-        print(list_orig_sen_A[sent].orig + "\n" + str(dict_sent_A[sent]))
-    print()
-    for i, sent in enumerate(reversed(sorted(dict_sent_B,
-                                             key=dict_sent_B.get))):
-        if i == n:
-            break
-        print(list_orig_sen_B[sent].orig + "\n" + str(dict_sent_B[sent]))
 
 
 def parse_options():
@@ -108,9 +112,9 @@ def parse_options():
     parser.add_option('--docpath', dest='docpath', type='str',
                       help='source document path')
     parser.add_option('-m', '--model',  dest='model', type='str',
-                      help='model type (WordNet, WE, WE_WMD, Cluster)')
+                      help='model type (WordNet, WE, WE_WMD, WE_SEN_WMD)')
     parser.add_option('-c', '--comparative',  dest='comparative', type='str',
-                      help='comparative method (ilp, knapsack)')
+                      help='comparative method (ilp, knapsack, ilp2, knapsack2)')
     parser.add_option('-l', '--length', dest='length', type='int',
                       help='maximum number of words in summaries', default=100)
     parser.add_option('-i', '--input-path', dest='inputpath', type='str',
@@ -169,35 +173,58 @@ if __name__ == '__main__':
 
     start = time.process_time()
 
-    # os.popen('mkdir -p %s' % os.path.join(options.outpath, 'summary'))
     os.makedirs(os.path.join(path, 'summary'), exist_ok=True)
-    # os.popen('mkdir -p %s' % os.path.join(path, 'summary'))
+
+    documents = [] # [Documents : [Sen]]
+    list_corpus = []
+    list_corpus_sen = []  # [Corpus : [SenA : [], SenB : []]]]]
     # run through all corpus
     for c_id in os.listdir(path):
         if 'summary' in c_id or 'rouge_settings.xml' in c_id or 'Model' in c_id or 'Peer' in c_id:
             continue
+        list_corpus.append(c_id)
+        # load sents
+        s_A, sents_A = browse_corpus.load_sents(os.path.join(path, c_id), c_id + '-A')
+        s_B, sents_B = browse_corpus.load_sents(os.path.join(path, c_id), c_id + '-B')
+        list_docs = browse_corpus.list_corpus_2_list_doc([sents_A, sents_B])
+        # document = []
+        # for doc in list_docs:
+            # for sen in doc:
+                # document.extend(sen.get_list_word())
+        # documents.append(document)
+        documents.extend([[word for sen in doc for word in sen] for doc in list_docs])
+        list_corpus_sen.append([sents_A, sents_B])
+
+    dictionary = Dictionary(documents)
+    bow_documents = [dictionary.doc2bow(document) for document in documents]
+    tfidf_model = TfidfModel(bow_documents, id2word=dictionary.id2token)
+
+    for i in range(len(list_corpus)):
+        c_id = list_corpus[i]
         # new output
         logger.info(c_id)
 
         summary_A, summary_B = make_comp_summary(options.comparative, options.model,
                                                  options.threshold,
-                                                 os.path.join(path, c_id), c_id,
-                                                 os.path.join(path, 'summary'),
-                                                 options.length)
+                                                 i,
+                                                 options.length,
+                                                 list_corpus_sen,
+                                                 dictionary,
+                                                 tfidf_model)
 
         os.makedirs(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold)), exist_ok=True)
 
         with open(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold), c_id + "-A.sum"), 'w') as f:
-            summ = '' 
+            summ = ''
             for sent in summary_A:
                 f.write(str(sent) + '\n')
                 summ += str(sent) + '\n'
             logger.info(summ)
         with open(os.path.join(path, 'summary', options.comparative + '_' +
                                options.model, str(options.threshold), c_id + "-B.sum"), 'w') as f:
-            summ = '' 
+            summ = ''
             for sent in summary_B:
                 f.write(str(sent) + '\n')
                 summ += str(sent) + '\n'
